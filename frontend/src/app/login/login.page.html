@@ -1,0 +1,58 @@
+<main class="login-page">
+  <section class="login-panel" aria-labelledby="login-title">
+    <div class="brand">
+      <p class="eyebrow">Senshi Passo de Torres</p>
+      <h1 id="login-title">Catálogo e planejamento de treinos</h1>
+    </div>
+
+    <form class="login-form" (ngSubmit)="submit()" novalidate>
+      <div class="field">
+        <label for="email">E-mail</label>
+        <input
+          id="email"
+          name="email"
+          type="email"
+          pInputText
+          autocomplete="email"
+          inputmode="email"
+          [(ngModel)]="email"
+          [disabled]="loading()"
+          required
+        />
+      </div>
+
+      <div class="field">
+        <label for="password">Senha</label>
+        <input
+          id="password"
+          name="password"
+          type="password"
+          pInputText
+          autocomplete="current-password"
+          [(ngModel)]="password"
+          [disabled]="loading()"
+          required
+        />
+      </div>
+
+      @if (errorMessage()) {
+        <p class="auth-error" role="alert">{{ errorMessage() }}</p>
+      }
+
+      <button
+        pButton
+        type="submit"
+        class="login-action"
+        [disabled]="loading()"
+        [attr.aria-busy]="loading()"
+      >
+        @if (loading()) {
+          <i class="pi pi-spin pi-spinner" aria-hidden="true"></i>
+          <span>Entrando</span>
+        } @else {
+          <span>Entrar</span>
+        }
+      </button>
+    </form>
+  </section>
+</main>
