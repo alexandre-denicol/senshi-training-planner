@@ -1,0 +1,36 @@
+# OS and editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Go
+bin/
+backend/create-admin
+backend/migrate
+backend/server
+coverage.out
+*.test
+
+# Angular / Node
+node_modules/
+dist/
+.angular/
+.npm/
+
+# Build outputs
+tmp/
+coverage/

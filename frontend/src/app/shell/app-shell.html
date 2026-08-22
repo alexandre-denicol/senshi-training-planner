@@ -1,0 +1,83 @@
+<div class="admin-shell">
+  <aside class="sidebar" aria-label="Navegação principal">
+    <div class="sidebar-brand">
+      <span class="brand-mark">S</span>
+      <span>Senshi</span>
+    </div>
+    <nav>
+      @for (item of visibleNavItems(); track item.label) {
+        <button type="button" class="nav-item">
+          <i [class]="item.icon" aria-hidden="true"></i>
+          <span>{{ item.label }}</span>
+        </button>
+      }
+    </nav>
+  </aside>
+
+  @if (drawerOpen()) {
+    <button
+      type="button"
+      class="drawer-backdrop"
+      aria-label="Fechar navegação"
+      (click)="drawerOpen.set(false)"
+    ></button>
+  }
+
+  <aside class="mobile-drawer" [class.open]="drawerOpen()" aria-label="Navegação principal">
+    <div class="sidebar-brand">
+      <span class="brand-mark">S</span>
+      <span>Senshi</span>
+    </div>
+    <nav>
+      @for (item of visibleNavItems(); track item.label) {
+        <button type="button" class="nav-item" (click)="drawerOpen.set(false)">
+          <i [class]="item.icon" aria-hidden="true"></i>
+          <span>{{ item.label }}</span>
+        </button>
+      }
+    </nav>
+  </aside>
+
+  <main class="main-panel">
+    <header class="topbar">
+      <button
+        pButton
+        type="button"
+        class="menu-button"
+        aria-label="Abrir navegação"
+        (click)="drawerOpen.set(true)"
+      >
+        <i class="pi pi-bars" aria-hidden="true"></i>
+      </button>
+
+      <div class="account-area">
+        <div class="user-summary">
+          <span class="user-name">{{ user().name }}</span>
+          <span class="user-role">{{ user().role === 'ADMIN' ? 'Admin' : 'Professor' }}</span>
+        </div>
+
+        <button
+          pButton
+          type="button"
+          class="logout-button"
+          aria-label="Sair"
+          title="Sair"
+          (click)="logout()"
+        >
+          <i class="pi pi-sign-out" aria-hidden="true"></i>
+        </button>
+      </div>
+    </header>
+
+    <section class="content" aria-labelledby="welcome-title">
+      <div class="empty-state">
+        <p class="section-label">Área autenticada</p>
+        <h1 id="welcome-title">Bem-vindo(a) a Senshi Passo de Torres</h1>
+        <p>
+          Use a navegação para acessar as áreas do sistema quando os módulos forem
+          implementados.
+        </p>
+      </div>
+    </section>
+  </main>
+</div>
