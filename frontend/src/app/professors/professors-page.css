@@ -1,0 +1,312 @@
+.professors-page {
+  display: grid;
+  gap: 1rem;
+}
+
+.page-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+h1 {
+  color: #ffffff;
+  font-size: clamp(1.7rem, 3vw, 2.25rem);
+  line-height: 1.1;
+  margin: 0;
+}
+
+.page-header p {
+  color: #aebacc;
+  line-height: 1.5;
+  margin: 0.45rem 0 0;
+}
+
+.primary-action,
+.empty-list button {
+  align-items: center;
+  background: #14b8a6;
+  border-color: #14b8a6;
+  color: #04110f;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-weight: 750;
+  gap: 0.5rem;
+  min-height: 2.5rem;
+}
+
+.surface {
+  background: #171a1f;
+  border: 1px solid #2a3039;
+  border-radius: 8px;
+  min-height: 12rem;
+  overflow: hidden;
+}
+
+.feedback {
+  border: 1px solid;
+  border-radius: 6px;
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+}
+
+.feedback.success {
+  background: rgba(20, 184, 166, 0.1);
+  border-color: rgba(94, 234, 212, 0.38);
+  color: #9ff5e8;
+}
+
+.feedback.error {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(248, 113, 113, 0.4);
+  color: #fecaca;
+}
+
+.loading-state,
+.empty-list {
+  align-items: center;
+  display: grid;
+  justify-items: center;
+  min-height: 14rem;
+  padding: 2rem;
+  text-align: center;
+}
+
+.empty-list {
+  gap: 1rem;
+}
+
+.empty-list p {
+  color: #cbd5e1;
+  margin: 0;
+}
+
+.desktop-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.desktop-table th {
+  background: #1b1f26;
+  border-bottom: 1px solid #303743;
+  color: #dbe5f3;
+  font-size: 0.8rem;
+  letter-spacing: 0;
+  padding: 0.9rem 1rem;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.desktop-table td {
+  border-bottom: 1px solid #2a3039;
+  color: #e5edf7;
+  padding: 0.9rem 1rem;
+}
+
+.actions-heading {
+  text-align: right;
+}
+
+.row-actions,
+.card-actions {
+  display: flex;
+  gap: 0.4rem;
+  justify-content: flex-end;
+}
+
+.status-badge {
+  background: rgba(20, 184, 166, 0.12);
+  border: 1px solid rgba(94, 234, 212, 0.34);
+  border-radius: 999px;
+  color: #9ff5e8;
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1;
+  padding: 0.35rem 0.55rem;
+}
+
+.status-badge.inactive {
+  background: #232832;
+  border-color: #3a4350;
+  color: #cbd5e1;
+}
+
+.loading-indicator {
+  animation: spin 800ms linear infinite;
+  border: 3px solid #343a45;
+  border-top-color: #5eead4;
+  border-radius: 999px;
+  height: 2rem;
+  width: 2rem;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.icon-action {
+  align-items: center;
+  background: #20242b;
+  border-color: #343a45;
+  color: #dbe5f3;
+  display: inline-flex;
+  height: 2.35rem;
+  justify-content: center;
+  padding: 0;
+  width: 2.35rem;
+}
+
+.icon-action:hover {
+  background: #28303a;
+  border-color: #465161;
+}
+
+.icon-action.danger,
+.danger-action {
+  color: #fecaca;
+}
+
+.mobile-list {
+  display: none;
+}
+
+.professor-card {
+  background: #171a1f;
+  border-bottom: 1px solid #2a3039;
+  display: grid;
+  gap: 0.8rem;
+  padding: 1rem;
+}
+
+.professor-card h2 {
+  color: #ffffff;
+  font-size: 1rem;
+  margin: 0;
+}
+
+.professor-card p {
+  color: #aebacc;
+  margin: 0.25rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+dl {
+  display: flex;
+  gap: 0.45rem;
+  margin: 0;
+}
+
+dt {
+  color: #94a3b8;
+}
+
+dd {
+  color: #e2e8f0;
+  margin: 0;
+}
+
+.dialog-form {
+  display: grid;
+  gap: 0.9rem;
+  min-width: min(24rem, calc(100vw - 3rem));
+}
+
+.dialog-form label {
+  color: #dbe5f3;
+  display: grid;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+
+.dialog-form input {
+  width: 100%;
+}
+
+.form-hint {
+  color: #aebacc;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.form-error {
+  color: #fecaca;
+  font-size: 0.88rem;
+  margin: 0;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 0.65rem;
+  justify-content: flex-end;
+  margin-top: 0.4rem;
+}
+
+.secondary-action {
+  background: #20242b;
+  border-color: #343a45;
+  color: #e2e8f0;
+}
+
+.confirmation-body p {
+  color: #dbe5f3;
+  line-height: 1.5;
+  margin: 0;
+  max-width: 26rem;
+}
+
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid #5eead4;
+  outline-offset: 2px;
+}
+
+:host ::ng-deep .professor-dialog {
+  background: #171a1f;
+  border: 1px solid #303743;
+  border-radius: 8px;
+  color: #f8fafc;
+}
+
+:host ::ng-deep .professor-dialog .p-dialog-header,
+:host ::ng-deep .professor-dialog .p-dialog-content {
+  background: #171a1f;
+  color: #f8fafc;
+}
+
+@media (max-width: 760px) {
+  .page-header {
+    display: grid;
+  }
+
+  .primary-action {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .desktop-table {
+    display: none;
+  }
+
+  .mobile-list {
+    display: grid;
+  }
+
+  .card-actions {
+    justify-content: flex-start;
+  }
+
+  .icon-action {
+    height: 2.6rem;
+    width: 2.6rem;
+  }
+
+  .dialog-actions {
+    display: grid;
+  }
+}

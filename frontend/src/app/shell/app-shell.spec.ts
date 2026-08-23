@@ -1,6 +1,6 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { Router } from '@angular/router';
+import { provideRouter } from '@angular/router';
 import { AuthService } from '../auth/auth.service';
 import { AuthUser } from '../auth/auth.models';
 import { AppShell } from './app-shell';
@@ -47,12 +47,7 @@ async function renderShell(user: AuthUser) {
           logout: () => Promise.resolve(),
         },
       },
-      {
-        provide: Router,
-        useValue: {
-          navigateByUrl: () => Promise.resolve(true),
-        },
-      },
+      provideRouter([]),
     ],
   }).compileComponents();
 

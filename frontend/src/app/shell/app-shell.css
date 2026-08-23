@@ -52,6 +52,7 @@ nav {
   min-height: 2.75rem;
   padding: 0.7rem 0.75rem;
   text-align: left;
+  text-decoration: none;
   width: 100%;
 }
 
@@ -126,35 +127,6 @@ nav {
 
 .content {
   padding: clamp(1rem, 3vw, 2rem);
-}
-
-.empty-state {
-  background: #171a1f;
-  border: 1px solid #2a3039;
-  border-radius: 8px;
-  max-width: 46rem;
-  padding: clamp(1.25rem, 4vw, 2rem);
-}
-
-.section-label {
-  color: #5eead4;
-  font-size: 0.8rem;
-  font-weight: 800;
-  margin: 0 0 0.75rem;
-  text-transform: uppercase;
-}
-
-h1 {
-  color: #ffffff;
-  font-size: clamp(1.6rem, 4vw, 2.4rem);
-  line-height: 1.1;
-  margin: 0;
-}
-
-.empty-state p:last-child {
-  color: #b6c2d2;
-  line-height: 1.6;
-  margin: 1rem 0 0;
 }
 
 button:focus-visible {

@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink, RouterOutlet } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
 import { AuthService } from '../auth/auth.service';
 import { AuthUser } from '../auth/auth.models';
@@ -8,6 +8,7 @@ import { AuthUser } from '../auth/auth.models';
 interface NavItem {
   label: string;
   icon: string;
+  path?: string;
   adminOnly?: boolean;
 }
 
@@ -17,11 +18,11 @@ const navItems: NavItem[] = [
   { label: 'Blocos', icon: 'pi pi-th-large' },
   { label: 'Categorias', icon: 'pi pi-tags' },
   { label: 'Histórico', icon: 'pi pi-clock' },
-  { label: 'Professores', icon: 'pi pi-users', adminOnly: true },
+  { label: 'Professores', icon: 'pi pi-users', path: '/app/professores', adminOnly: true },
 ];
 
 @Component({
-  imports: [ButtonModule, CommonModule],
+  imports: [ButtonModule, CommonModule, RouterLink, RouterOutlet],
   selector: 'app-shell',
   styleUrl: './app-shell.css',
   templateUrl: './app-shell.html',
@@ -36,6 +37,10 @@ export class AppShell {
     const user = this.auth.currentUser();
     return navItems.filter((item) => !item.adminOnly || user?.role === 'ADMIN');
   });
+
+  protected closeDrawer(): void {
+    this.drawerOpen.set(false);
+  }
 
   protected async logout(): Promise<void> {
     await this.auth.logout();
