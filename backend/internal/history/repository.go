@@ -8,6 +8,7 @@ import (
 	"github.com/alexandre/senshi-training-planner/backend/internal/auth"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -24,7 +25,7 @@ func NewPostgresStore(pool *pgxpool.Pool) *PostgresStore {
 func (s *PostgresStore) ListHistory(ctx context.Context, from string, to string) ([]ListItem, error) {
 	const query = `
 		SELECT th.id::text, th.training_date::text, th.workout_name, count(thb.position)::int,
-			th.completed_by_name, th.completed_at, th.schedule_entry_id::text
+			th.participant_count, th.completed_by_name, th.completed_at, th.schedule_entry_id::text
 		FROM training_history th
 		LEFT JOIN training_history_blocks thb ON thb.history_id = th.id
 		WHERE th.training_date >= $1::date AND th.training_date <= $2::date
@@ -56,7 +57,7 @@ func (s *PostgresStore) GetHistory(ctx context.Context, id string) (Detail, erro
 	return getHistory(ctx, s.pool, id)
 }
 
-func (s *PostgresStore) CompleteScheduleEntry(ctx context.Context, historyID string, scheduleEntryID string, completedBy auth.PublicUser, completedAt time.Time) (Detail, error) {
+func (s *PostgresStore) CompleteScheduleEntry(ctx context.Context, historyID string, scheduleEntryID string, completedBy auth.PublicUser, completedAt time.Time, details CompletionDetails) (Detail, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return Detail{}, err
@@ -82,9 +83,9 @@ func (s *PostgresStore) CompleteScheduleEntry(ctx context.Context, historyID str
 	const historyQuery = `
 		INSERT INTO training_history (
 			id, schedule_entry_id, training_date, workout_id, workout_name,
-			completed_by_user_id, completed_by_name, completed_at
+			completed_by_user_id, completed_by_name, completed_at, participant_count
 		)
-		VALUES ($1, $2, $3::date, $4, $5, $6, $7, $8)`
+		VALUES ($1, $2, $3::date, $4, $5, $6, $7, $8, $9)`
 	if _, err := tx.Exec(ctx, historyQuery,
 		historyID,
 		scheduleEntryID,
@@ -94,6 +95,7 @@ func (s *PostgresStore) CompleteScheduleEntry(ctx context.Context, historyID str
 		completedBy.ID,
 		completedBy.Name,
 		completedAt,
+		details.ParticipantCount,
 	); historyDuplicateViolation(err) {
 		return Detail{}, ErrAlreadyCompleted
 	} else if err != nil {
@@ -114,6 +116,15 @@ func (s *PostgresStore) CompleteScheduleEntry(ctx context.Context, historyID str
 			block.CategoryID,
 			block.CategoryName,
 		); err != nil {
+			return Detail{}, err
+		}
+	}
+
+	const participantQuery = `
+		INSERT INTO training_history_participants (history_id, position, name)
+		VALUES ($1, $2, $3)`
+	for index, name := range details.ParticipantNames {
+		if _, err := tx.Exec(ctx, participantQuery, historyID, index+1, name); err != nil {
 			return Detail{}, err
 		}
 	}
@@ -214,15 +225,17 @@ func readWorkoutBlockSnapshots(ctx context.Context, tx pgx.Tx, workoutID string)
 
 func getHistory(ctx context.Context, db queryer, id string) (Detail, error) {
 	const historyQuery = `
-		SELECT id::text, training_date::text, workout_name, completed_by_name, completed_at
+		SELECT id::text, training_date::text, workout_name, participant_count, completed_by_name, completed_at
 		FROM training_history
 		WHERE id = $1`
 
 	var detail Detail
+	var participantCount pgtype.Int4
 	err := db.QueryRow(ctx, historyQuery, id).Scan(
 		&detail.ID,
 		&detail.TrainingDate,
 		&detail.WorkoutName,
+		&participantCount,
 		&detail.CompletedByName,
 		&detail.CompletedAt,
 	)
@@ -231,6 +244,10 @@ func getHistory(ctx context.Context, db queryer, id string) (Detail, error) {
 	}
 	if err != nil {
 		return Detail{}, err
+	}
+	if participantCount.Valid {
+		value := int(participantCount.Int32)
+		detail.ParticipantCount = &value
 	}
 
 	const blocksQuery = `
@@ -257,6 +274,30 @@ func getHistory(ctx context.Context, db queryer, id string) (Detail, error) {
 		return Detail{}, err
 	}
 
+	const participantsQuery = `
+		SELECT name
+		FROM training_history_participants
+		WHERE history_id = $1
+		ORDER BY position ASC`
+
+	participantRows, err := db.Query(ctx, participantsQuery, id)
+	if err != nil {
+		return Detail{}, err
+	}
+	defer participantRows.Close()
+
+	detail.ParticipantNames = []string{}
+	for participantRows.Next() {
+		var name string
+		if err := participantRows.Scan(&name); err != nil {
+			return Detail{}, err
+		}
+		detail.ParticipantNames = append(detail.ParticipantNames, name)
+	}
+	if err := participantRows.Err(); err != nil {
+		return Detail{}, err
+	}
+
 	return detail, nil
 }
 
@@ -266,17 +307,23 @@ type listItemScanner interface {
 
 func scanListItem(row listItemScanner) (ListItem, error) {
 	var item ListItem
+	var participantCount pgtype.Int4
 	err := row.Scan(
 		&item.ID,
 		&item.TrainingDate,
 		&item.WorkoutName,
 		&item.BlockCount,
+		&participantCount,
 		&item.CompletedByName,
 		&item.CompletedAt,
 		&item.ScheduleEntryID,
 	)
 	if err != nil {
 		return ListItem{}, err
+	}
+	if participantCount.Valid {
+		value := int(participantCount.Int32)
+		item.ParticipantCount = &value
 	}
 
 	return item, nil

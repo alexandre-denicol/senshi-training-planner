@@ -36,6 +36,8 @@ describe('HistoryApiService', () => {
       id: 'history-id',
       trainingDate: '2026-08-24',
       workoutName: 'Treino',
+      participantCount: 12,
+      participantNames: ['João'],
       completedByName: 'Professor',
       completedAt: '2026-08-24T15:32:00Z',
       blocks: [],

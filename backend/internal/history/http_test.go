@@ -49,13 +49,20 @@ func TestHistoryHTTPListDetailAndCompletionErrors(t *testing.T) {
 	if !strings.Contains(list.Body.String(), `"blockCount":2`) {
 		t.Fatalf("expected compact history list, got %s", list.Body.String())
 	}
+	if !strings.Contains(list.Body.String(), `"participantCount":1`) || strings.Contains(list.Body.String(), "participantNames") {
+		t.Fatalf("expected compact participant count without names in list, got %s", list.Body.String())
+	}
 
+	service.detail = detailWithParticipantsFixture()
 	detail := performHistoryRequest(t, auth.RoleProfessor, service, http.MethodGet, "/history/"+historyID)
 	if detail.Code != http.StatusOK {
 		t.Fatalf("expected detail 200, got %d", detail.Code)
 	}
 	if !strings.Contains(detail.Body.String(), `"blockName":"Bloco A"`) || !strings.Contains(detail.Body.String(), `"categoryName":"Categoria A"`) {
 		t.Fatalf("expected snapshot blocks, got %s", detail.Body.String())
+	}
+	if !strings.Contains(detail.Body.String(), `"participantCount":12`) || !strings.Contains(detail.Body.String(), `"participantNames":["João","Maria"]`) {
+		t.Fatalf("expected participant details, got %s", detail.Body.String())
 	}
 
 	service.listErr = ErrInvalidRequest
@@ -85,6 +92,58 @@ func TestHistoryHTTPListDetailAndCompletionErrors(t *testing.T) {
 	}
 }
 
+func TestHistoryHTTPCompletionRequestBody(t *testing.T) {
+	tests := []struct {
+		name      string
+		body      string
+		wantCode  int
+		wantCount *int
+		wantNames []string
+	}{
+		{name: "no body remains valid", body: "", wantCode: http.StatusCreated, wantNames: []string{}},
+		{name: "empty object valid", body: `{}`, wantCode: http.StatusCreated, wantNames: []string{}},
+		{name: "count only", body: `{"participantCount":12}`, wantCode: http.StatusCreated, wantCount: intPtr(12), wantNames: []string{}},
+		{name: "names only", body: `{"participantNames":["João","Maria"]}`, wantCode: http.StatusCreated, wantNames: []string{"João", "Maria"}},
+		{name: "count and names", body: `{"participantCount":1,"participantNames":["João","Maria"]}`, wantCode: http.StatusCreated, wantCount: intPtr(1), wantNames: []string{"João", "Maria"}},
+		{name: "zero preserved", body: `{"participantCount":0}`, wantCode: http.StatusCreated, wantCount: intPtr(0), wantNames: []string{}},
+		{name: "decimal count rejected", body: `{"participantCount":2.5}`, wantCode: http.StatusBadRequest},
+		{name: "negative count rejected", body: `{"participantCount":-1}`, wantCode: http.StatusBadRequest},
+		{name: "blank name rejected", body: `{"participantNames":["   "]}`, wantCode: http.StatusBadRequest},
+		{name: "unknown field rejected", body: `{"participantCount":1,"completedAt":"2026-08-23T12:00:00Z"}`, wantCode: http.StatusBadRequest},
+		{name: "malformed json rejected", body: `{"participantCount":`, wantCode: http.StatusBadRequest},
+		{name: "trailing json rejected", body: `{"participantCount":1} {"participantCount":2}`, wantCode: http.StatusBadRequest},
+		{name: "non object rejected", body: `[]`, wantCode: http.StatusBadRequest},
+		{name: "oversized body rejected", body: `{"participantNames":["` + strings.Repeat("a", 20*1024) + `"]}`, wantCode: http.StatusBadRequest},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			service := &fakeHistoryService{detail: detailFixture()}
+			response := performCompleteRequestWithBody(t, auth.RoleAdmin, service, http.MethodPost, "/schedule/"+scheduleEntryID+"/complete", tt.body)
+			if response.Code != tt.wantCode {
+				t.Fatalf("expected status %d, got %d with body %s", tt.wantCode, response.Code, response.Body.String())
+			}
+			if tt.wantCode != http.StatusCreated {
+				return
+			}
+			if (tt.wantCount == nil) != (service.details.ParticipantCount == nil) {
+				t.Fatalf("expected count %#v, got %#v", tt.wantCount, service.details.ParticipantCount)
+			}
+			if tt.wantCount != nil && *tt.wantCount != *service.details.ParticipantCount {
+				t.Fatalf("expected count %d, got %d", *tt.wantCount, *service.details.ParticipantCount)
+			}
+			if len(service.details.ParticipantNames) != len(tt.wantNames) {
+				t.Fatalf("expected names %#v, got %#v", tt.wantNames, service.details.ParticipantNames)
+			}
+			for index, want := range tt.wantNames {
+				if service.details.ParticipantNames[index] != want {
+					t.Fatalf("expected names %#v, got %#v", tt.wantNames, service.details.ParticipantNames)
+				}
+			}
+		})
+	}
+}
+
 func performHistoryRequest(t *testing.T, role auth.Role, service ServiceAPI, method string, path string) *httptest.ResponseRecorder {
 	t.Helper()
 	user := auth.PublicUser{ID: userID, Name: "User", Email: "user@example.com", Role: role}
@@ -99,12 +158,18 @@ func performUnauthenticatedHistoryRequest(t *testing.T, service ServiceAPI, meth
 func performCompleteRequest(t *testing.T, role auth.Role, service ServiceAPI, method string, path string) *httptest.ResponseRecorder {
 	t.Helper()
 	user := auth.PublicUser{ID: userID, Name: "User", Email: "user@example.com", Role: role}
-	return performCompleteAuthenticatedRequest(t, &user, service, method, path)
+	return performCompleteAuthenticatedRequest(t, &user, service, method, path, "")
+}
+
+func performCompleteRequestWithBody(t *testing.T, role auth.Role, service ServiceAPI, method string, path string, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	user := auth.PublicUser{ID: userID, Name: "User", Email: "user@example.com", Role: role}
+	return performCompleteAuthenticatedRequest(t, &user, service, method, path, body)
 }
 
 func performUnauthenticatedCompleteRequest(t *testing.T, service ServiceAPI, method string, path string) *httptest.ResponseRecorder {
 	t.Helper()
-	return performCompleteAuthenticatedRequest(t, nil, service, method, path)
+	return performCompleteAuthenticatedRequest(t, nil, service, method, path, "")
 }
 
 func performAuthenticatedRequest(t *testing.T, user *auth.PublicUser, service ServiceAPI, method string, path string) *httptest.ResponseRecorder {
@@ -124,7 +189,7 @@ func performAuthenticatedRequest(t *testing.T, user *auth.PublicUser, service Se
 	return response
 }
 
-func performCompleteAuthenticatedRequest(t *testing.T, user *auth.PublicUser, service ServiceAPI, method string, path string) *httptest.ResponseRecorder {
+func performCompleteAuthenticatedRequest(t *testing.T, user *auth.PublicUser, service ServiceAPI, method string, path string, body string) *httptest.ResponseRecorder {
 	t.Helper()
 
 	authHandler, historyHandler := testHandlers(user, service)
@@ -138,7 +203,16 @@ func performCompleteAuthenticatedRequest(t *testing.T, user *auth.PublicUser, se
 		w.WriteHeader(http.StatusNotFound)
 	})))
 
-	request := httptest.NewRequest(method, path, nil)
+	var requestBody *strings.Reader
+	if body == "" {
+		requestBody = strings.NewReader("")
+	} else {
+		requestBody = strings.NewReader(body)
+	}
+	request := httptest.NewRequest(method, path, requestBody)
+	if body != "" {
+		request.Header.Set("Content-Type", "application/json")
+	}
 	if user != nil {
 		request.AddCookie(&http.Cookie{Name: auth.CookieName, Value: "raw-token"})
 	}
@@ -163,6 +237,7 @@ type fakeHistoryService struct {
 	listErr     error
 	getErr      error
 	completeErr error
+	details     CompletionDetails
 }
 
 func (s *fakeHistoryService) List(_ context.Context, from string, to string) ([]ListItem, error) {
@@ -181,8 +256,13 @@ func (s *fakeHistoryService) Get(context.Context, string) (Detail, error) {
 	return s.detail, nil
 }
 
-func (s *fakeHistoryService) Complete(_ context.Context, _ string, completedBy auth.PublicUser) (Detail, error) {
+func (s *fakeHistoryService) Complete(_ context.Context, _ string, completedBy auth.PublicUser, details CompletionDetails) (Detail, error) {
+	normalizedDetails, err := validateCompletionDetails(details)
+	if err != nil {
+		return Detail{}, err
+	}
 	s.completedBy = completedBy
+	s.details = normalizedDetails
 	if s.completeErr != nil {
 		return Detail{}, s.completeErr
 	}

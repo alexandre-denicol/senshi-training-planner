@@ -51,12 +51,16 @@ func (s *Service) Get(ctx context.Context, id string) (Detail, error) {
 	return mapDetailResult(detail, err)
 }
 
-func (s *Service) Complete(ctx context.Context, scheduleEntryID string, completedBy auth.PublicUser) (Detail, error) {
+func (s *Service) Complete(ctx context.Context, scheduleEntryID string, completedBy auth.PublicUser, details CompletionDetails) (Detail, error) {
 	if !validID(scheduleEntryID) {
 		return Detail{}, ErrScheduleNotFound
 	}
 	if strings.TrimSpace(completedBy.ID) == "" || strings.TrimSpace(completedBy.Name) == "" {
 		return Detail{}, ErrInvalidRequest
+	}
+	normalizedDetails, err := validateCompletionDetails(details)
+	if err != nil {
+		return Detail{}, err
 	}
 
 	historyID, err := s.newUUID()
@@ -64,7 +68,7 @@ func (s *Service) Complete(ctx context.Context, scheduleEntryID string, complete
 		return Detail{}, err
 	}
 
-	detail, err := s.store.CompleteScheduleEntry(ctx, historyID, scheduleEntryID, completedBy, s.now())
+	detail, err := s.store.CompleteScheduleEntry(ctx, historyID, scheduleEntryID, completedBy, s.now(), normalizedDetails)
 	return mapDetailResult(detail, err)
 }
 
@@ -120,4 +124,32 @@ func validID(id string) bool {
 	}
 
 	return true
+}
+
+func validateCompletionDetails(details CompletionDetails) (CompletionDetails, error) {
+	if details.ParticipantCount != nil {
+		if *details.ParticipantCount < 0 || *details.ParticipantCount > MaxParticipantCount {
+			return CompletionDetails{}, ErrInvalidRequest
+		}
+	}
+	if len(details.ParticipantNames) > MaxParticipantNames {
+		return CompletionDetails{}, ErrInvalidRequest
+	}
+
+	names := make([]string, 0, len(details.ParticipantNames))
+	for _, name := range details.ParticipantNames {
+		trimmed := strings.TrimSpace(name)
+		if trimmed == "" {
+			return CompletionDetails{}, ErrInvalidRequest
+		}
+		if len([]rune(trimmed)) > MaxParticipantNameChars {
+			return CompletionDetails{}, ErrInvalidRequest
+		}
+		names = append(names, trimmed)
+	}
+
+	return CompletionDetails{
+		ParticipantCount: details.ParticipantCount,
+		ParticipantNames: names,
+	}, nil
 }

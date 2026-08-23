@@ -7,6 +7,7 @@ export interface HistoryListItem {
   trainingDate: string;
   workoutName: string;
   blockCount: number;
+  participantCount: number | null;
   completedByName: string;
   completedAt: string;
   scheduleEntryId: string;
@@ -22,6 +23,8 @@ export interface HistoryDetail {
   id: string;
   trainingDate: string;
   workoutName: string;
+  participantCount: number | null;
+  participantNames: string[];
   completedByName: string;
   completedAt: string;
   blocks: HistoryBlock[];
