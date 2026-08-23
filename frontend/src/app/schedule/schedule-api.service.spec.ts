@@ -50,6 +50,14 @@ describe('ScheduleApiService', () => {
     expect(request.request.withCredentials).toBe(true);
     request.flush(null, { status: 204, statusText: 'No Content' });
     await remove;
+
+    const complete = service.complete('schedule-id');
+    request = http.expectOne('/api/schedule/schedule-id/complete');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toBeNull();
+    expect(request.request.withCredentials).toBe(true);
+    request.flush({});
+    await complete;
   });
 });
 

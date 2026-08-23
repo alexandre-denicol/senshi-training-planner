@@ -24,6 +24,7 @@ describe('AppShell', () => {
     const fixture = await renderShell(adminUser);
 
     expect(fixture.nativeElement.textContent).toContain('Agenda');
+    expect(fixture.nativeElement.textContent).toContain('Histórico');
     expect(fixture.nativeElement.textContent).toContain('Professores');
     expect(fixture.nativeElement.textContent).toContain('Categorias');
     expect(fixture.nativeElement.textContent).toContain('Blocos');
@@ -34,6 +35,7 @@ describe('AppShell', () => {
     const fixture = await renderShell(professorUser);
 
     expect(fixture.nativeElement.textContent).toContain('Agenda');
+    expect(fixture.nativeElement.textContent).toContain('Histórico');
     expect(fixture.nativeElement.textContent).not.toContain('Professores');
     expect(fixture.nativeElement.textContent).not.toContain('Categorias');
     expect(fixture.nativeElement.textContent).not.toContain('Blocos');

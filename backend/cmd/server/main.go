@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/alexandre/senshi-training-planner/backend/internal/auth"
@@ -12,6 +13,7 @@ import (
 	"github.com/alexandre/senshi-training-planner/backend/internal/categories"
 	"github.com/alexandre/senshi-training-planner/backend/internal/config"
 	"github.com/alexandre/senshi-training-planner/backend/internal/database"
+	"github.com/alexandre/senshi-training-planner/backend/internal/history"
 	"github.com/alexandre/senshi-training-planner/backend/internal/professors"
 	"github.com/alexandre/senshi-training-planner/backend/internal/schedule"
 	"github.com/alexandre/senshi-training-planner/backend/internal/workouts"
@@ -50,6 +52,9 @@ func main() {
 	scheduleStore := schedule.NewPostgresStore(pool)
 	scheduleService := schedule.NewService(scheduleStore)
 	scheduleHandler := schedule.NewHandler(scheduleService)
+	historyStore := history.NewPostgresStore(pool)
+	historyService := history.NewService(historyStore)
+	historyHandler := history.NewHandler(historyService)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", healthHandler)
@@ -72,7 +77,15 @@ func main() {
 		}
 		auth.RequireAdmin(http.HandlerFunc(scheduleHandler.Collection)).ServeHTTP(w, r)
 	})))
-	mux.Handle("/schedule/", adminOnly(http.HandlerFunc(scheduleHandler.Resource)))
+	mux.Handle("/schedule/", authHandler.Authenticate(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if scheduleCompletePath(r.URL.Path) {
+			historyHandler.CompleteSchedule(w, r, scheduleCompleteID(r.URL.Path))
+			return
+		}
+		auth.RequireAdmin(http.HandlerFunc(scheduleHandler.Resource)).ServeHTTP(w, r)
+	})))
+	mux.Handle("/history", authHandler.Authenticate(http.HandlerFunc(historyHandler.Collection)))
+	mux.Handle("/history/", authHandler.Authenticate(http.HandlerFunc(historyHandler.Resource)))
 
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,
@@ -96,4 +109,18 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 	}
+}
+
+func scheduleCompletePath(path string) bool {
+	segments := strings.Split(strings.Trim(strings.TrimPrefix(path, "/schedule/"), "/"), "/")
+	return len(segments) == 2 && segments[0] != "" && segments[1] == "complete"
+}
+
+func scheduleCompleteID(path string) string {
+	segments := strings.Split(strings.Trim(strings.TrimPrefix(path, "/schedule/"), "/"), "/")
+	if len(segments) == 0 {
+		return ""
+	}
+
+	return segments[0]
 }

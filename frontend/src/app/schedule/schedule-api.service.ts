@@ -12,6 +12,7 @@ export interface ScheduleEntry {
   id: string;
   scheduledDate: string;
   workout: ScheduleWorkout;
+  completedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -48,6 +49,12 @@ export class ScheduleApiService {
   delete(id: string): Promise<void> {
     return firstValueFrom(
       this.http.delete<void>(`${this.baseUrl}/${id}`, { withCredentials: true }),
+    );
+  }
+
+  complete(id: string): Promise<unknown> {
+    return firstValueFrom(
+      this.http.post<unknown>(`${this.baseUrl}/${id}/complete`, null, { withCredentials: true }),
     );
   }
 }

@@ -108,6 +108,8 @@ func writeEntryResult(w http.ResponseWriter, successStatus int, entry Entry, err
 		httpapi.WriteError(w, http.StatusConflict, "workout already scheduled for date")
 	case errors.Is(err, ErrNotFound):
 		httpapi.WriteError(w, http.StatusNotFound, "schedule entry not found")
+	case errors.Is(err, ErrCompleted):
+		httpapi.WriteError(w, http.StatusConflict, "completed schedule entry cannot be changed")
 	default:
 		httpapi.WriteError(w, http.StatusInternalServerError, "internal server error")
 	}
@@ -121,6 +123,8 @@ func writeEmptyResult(w http.ResponseWriter, err error) {
 		httpapi.WriteError(w, http.StatusBadRequest, "invalid request")
 	case errors.Is(err, ErrNotFound):
 		httpapi.WriteError(w, http.StatusNotFound, "schedule entry not found")
+	case errors.Is(err, ErrCompleted):
+		httpapi.WriteError(w, http.StatusConflict, "completed schedule entry cannot be changed")
 	default:
 		httpapi.WriteError(w, http.StatusInternalServerError, "internal server error")
 	}

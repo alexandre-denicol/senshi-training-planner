@@ -3,6 +3,7 @@ package schedule
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -21,7 +22,7 @@ func NewPostgresStore(pool *pgxpool.Pool) *PostgresStore {
 
 func (s *PostgresStore) ListEntries(ctx context.Context, from string, to string) ([]Entry, error) {
 	const query = `
-		SELECT se.id::text, se.scheduled_date::text, w.id::text, w.name, w.active, se.created_at, se.updated_at
+		SELECT se.id::text, se.scheduled_date::text, w.id::text, w.name, w.active, se.completed_at, se.created_at, se.updated_at
 		FROM schedule_entries se
 		JOIN workouts w ON w.id = se.workout_id
 		WHERE se.scheduled_date >= $1::date AND se.scheduled_date <= $2::date
@@ -89,10 +90,14 @@ func (s *PostgresStore) UpdateEntry(ctx context.Context, id string, workoutID st
 	defer tx.Rollback(ctx)
 
 	var currentWorkoutID string
-	if err := tx.QueryRow(ctx, `SELECT workout_id::text FROM schedule_entries WHERE id = $1 FOR UPDATE`, id).Scan(&currentWorkoutID); errors.Is(err, pgx.ErrNoRows) {
+	var completedAt *time.Time
+	if err := tx.QueryRow(ctx, `SELECT workout_id::text, completed_at FROM schedule_entries WHERE id = $1 FOR UPDATE`, id).Scan(&currentWorkoutID, &completedAt); errors.Is(err, pgx.ErrNoRows) {
 		return Entry{}, ErrNotFound
 	} else if err != nil {
 		return Entry{}, err
+	}
+	if completedAt != nil {
+		return Entry{}, ErrCompleted
 	}
 
 	if currentWorkoutID != workoutID {
@@ -125,12 +130,31 @@ func (s *PostgresStore) UpdateEntry(ctx context.Context, id string, workoutID st
 }
 
 func (s *PostgresStore) DeleteEntry(ctx context.Context, id string) error {
-	commandTag, err := s.pool.Exec(ctx, `DELETE FROM schedule_entries WHERE id = $1`, id)
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	var completedAt *time.Time
+	if err := tx.QueryRow(ctx, `SELECT completed_at FROM schedule_entries WHERE id = $1 FOR UPDATE`, id).Scan(&completedAt); errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotFound
+	} else if err != nil {
+		return err
+	}
+	if completedAt != nil {
+		return ErrCompleted
+	}
+
+	commandTag, err := tx.Exec(ctx, `DELETE FROM schedule_entries WHERE id = $1`, id)
 	if err != nil {
 		return err
 	}
 	if commandTag.RowsAffected() == 0 {
 		return ErrNotFound
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return err
 	}
 
 	return nil
@@ -158,7 +182,7 @@ func validateActiveWorkout(ctx context.Context, tx pgx.Tx, workoutID string) err
 
 func getEntry(ctx context.Context, db queryer, id string) (Entry, error) {
 	const query = `
-		SELECT se.id::text, se.scheduled_date::text, w.id::text, w.name, w.active, se.created_at, se.updated_at
+		SELECT se.id::text, se.scheduled_date::text, w.id::text, w.name, w.active, se.completed_at, se.created_at, se.updated_at
 		FROM schedule_entries se
 		JOIN workouts w ON w.id = se.workout_id
 		WHERE se.id = $1`
@@ -186,6 +210,7 @@ func scanEntry(row entryScanner) (Entry, error) {
 		&entry.Workout.ID,
 		&entry.Workout.Name,
 		&entry.Workout.Active,
+		&entry.CompletedAt,
 		&entry.CreatedAt,
 		&entry.UpdatedAt,
 	)

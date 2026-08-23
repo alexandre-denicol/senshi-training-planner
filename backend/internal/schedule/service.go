@@ -75,6 +75,9 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 	if errors.Is(err, ErrNotFound) {
 		return ErrNotFound
 	}
+	if errors.Is(err, ErrCompleted) {
+		return ErrCompleted
+	}
 	return err
 }
 
@@ -87,6 +90,9 @@ func mapEntryResult(entry Entry, err error) (Entry, error) {
 	}
 	if errors.Is(err, ErrNotFound) {
 		return Entry{}, ErrNotFound
+	}
+	if errors.Is(err, ErrCompleted) {
+		return Entry{}, ErrCompleted
 	}
 	if err != nil {
 		return Entry{}, err

@@ -30,12 +30,13 @@ describe('SchedulePage', () => {
     expect(fixture.nativeElement.textContent).toContain('Agendar treino');
   });
 
-  it('allows PROFESSOR read-only access without mutation controls or workout option loading', async () => {
+  it('allows PROFESSOR completion access without schedule edit/delete controls or workout option loading', async () => {
     const workoutApi = new FakeWorkoutApi([workout()]);
     const { fixture } = await renderPage(professorUser, [entry()], [workout()], undefined, workoutApi);
     const text = fixture.nativeElement.textContent;
 
     expect(text).toContain('Treino Base');
+    expect(text).toContain('Marcar como realizado');
     expect(text).not.toContain('Agendar treino');
     expect(text).not.toContain('Editar');
     expect(text).not.toContain('Remover');
@@ -154,6 +155,61 @@ describe('SchedulePage', () => {
     expect(fixture.nativeElement.textContent).toContain('Nenhum treino agendado neste período.');
   });
 
+  it('completes entry after confirmation for ADMIN and PROFESSOR', async () => {
+    const original = entry({ id: 'entry-1', workout: { id: 'workout-1', name: 'Treino A', active: true } });
+    const adminApi = new FakeScheduleApi([original]);
+    const admin = await renderPage(adminUser, [original], [workout()], adminApi);
+
+    admin.component.confirmComplete(original);
+    expect(admin.component.confirmationTitle()).toBe('Marcar Treino A de 24/08/2026 como realizado?');
+    expect(admin.component.confirmationText()).toContain('registrará o treino no Histórico');
+    await admin.component.applyConfirmation();
+
+    expect(adminApi.completed).toEqual(['entry-1']);
+
+    const professorApi = new FakeScheduleApi([original]);
+    const professor = await renderPage(professorUser, [original], [workout()], professorApi);
+    professor.component.confirmComplete(original);
+    await professor.component.applyConfirmation();
+
+    expect(professorApi.completed).toEqual(['entry-1']);
+  });
+
+  it('shows completed state and hides impossible actions', async () => {
+    const completed = entry({ completedAt: '2026-08-23T15:32:00Z' });
+    const { fixture } = await renderPage(adminUser, [completed], [workout()]);
+    const text = fixture.nativeElement.textContent;
+
+    expect(text).toContain('Realizado');
+    expect(text).not.toContain('Marcar como realizado');
+    expect(text).not.toContain('Editar');
+    expect(text).not.toContain('Remover');
+  });
+
+  it('shows duplicate completion and completed immutability errors', async () => {
+    const original = entry({ id: 'entry-1' });
+    const api = new FakeScheduleApi([original]);
+    api.completeError = new HttpErrorResponse({ status: 409, statusText: 'Conflict' });
+    const { fixture, component } = await renderPage(adminUser, [original], [workout()], api);
+
+    component.confirmComplete(original);
+    await component.applyConfirmation();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Este treino já foi registrado como realizado.');
+
+    api.updateError = new HttpErrorResponse({ status: 409, statusText: 'Conflict' });
+    component.openEditDialog(original);
+    await component.updateEntry();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Treinos já realizados não podem ser alterados ou removidos.');
+
+    api.deleteError = new HttpErrorResponse({ status: 409, statusText: 'Conflict' });
+    component.confirmDelete(original);
+    await component.applyConfirmation();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Treinos já realizados não podem ser alterados ou removidos.');
+  });
+
   it('clears form state after dialog closes', async () => {
     const original = entry();
     const { component } = await renderPage(adminUser, [original], [workout()]);
@@ -233,7 +289,11 @@ class FakeScheduleApi {
   created: Array<{ workoutId: string; scheduledDate: string }> = [];
   updated: Array<{ id: string; request: { workoutId: string; scheduledDate: string } }> = [];
   deleted: string[] = [];
+  completed: string[] = [];
   createError: unknown = null;
+  updateError: unknown = null;
+  deleteError: unknown = null;
+  completeError: unknown = null;
 
   constructor(private entries: ScheduleEntry[]) {}
 
@@ -258,6 +318,9 @@ class FakeScheduleApi {
 
   async update(id: string, request: { workoutId: string; scheduledDate: string }): Promise<ScheduleEntry> {
     this.updated.push({ id, request });
+    if (this.updateError) {
+      throw this.updateError;
+    }
     const current = this.entries.find((item) => item.id === id) ?? entry({ id });
     const updated = {
       ...current,
@@ -270,7 +333,19 @@ class FakeScheduleApi {
 
   async delete(id: string): Promise<void> {
     this.deleted.push(id);
+    if (this.deleteError) {
+      throw this.deleteError;
+    }
     this.entries = this.entries.filter((item) => item.id !== id);
+  }
+
+  async complete(id: string): Promise<unknown> {
+    this.completed.push(id);
+    if (this.completeError) {
+      throw this.completeError;
+    }
+    this.entries = this.entries.map((item) => item.id === id ? { ...item, completedAt: '2026-08-23T15:32:00Z' } : item);
+    return {};
   }
 }
 

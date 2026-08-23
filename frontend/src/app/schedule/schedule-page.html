@@ -71,35 +71,44 @@
                 <article class="entry-card">
                   <div>
                     <h3>{{ entry.workout.name }}</h3>
+                    @if (isCompleted(entry)) {
+                      <span class="status-badge">Realizado</span>
+                    }
                     @if (!entry.workout.active) {
                       <span class="inline-badge">Inativo</span>
                     }
                   </div>
 
-                  @if (isAdmin()) {
+                  @if (!isCompleted(entry)) {
                     <div class="row-actions">
-                      <button
-                        pButton
-                        type="button"
-                        class="icon-action"
-                        aria-label="Editar agendamento"
-                        title="Editar"
-                        [disabled]="rowActionId() === entry.id"
-                        (click)="openEditDialog(entry)"
-                      >
-                        <i class="pi pi-pencil" aria-hidden="true"></i>
+                      <button pButton type="button" class="complete-action" [disabled]="rowActionId() === entry.id" (click)="confirmComplete(entry)">
+                        <i class="pi pi-check-circle" aria-hidden="true"></i>
+                        <span>Marcar como realizado</span>
                       </button>
-                      <button
-                        pButton
-                        type="button"
-                        class="icon-action danger"
-                        aria-label="Remover agendamento"
-                        title="Remover"
-                        [disabled]="rowActionId() === entry.id"
-                        (click)="confirmDelete(entry)"
-                      >
-                        <i class="pi pi-trash" aria-hidden="true"></i>
-                      </button>
+                      @if (isAdmin()) {
+                        <button
+                          pButton
+                          type="button"
+                          class="icon-action"
+                          aria-label="Editar agendamento"
+                          title="Editar"
+                          [disabled]="rowActionId() === entry.id"
+                          (click)="openEditDialog(entry)"
+                        >
+                          <i class="pi pi-pencil" aria-hidden="true"></i>
+                        </button>
+                        <button
+                          pButton
+                          type="button"
+                          class="icon-action danger"
+                          aria-label="Remover agendamento"
+                          title="Remover"
+                          [disabled]="rowActionId() === entry.id"
+                          (click)="confirmDelete(entry)"
+                        >
+                          <i class="pi pi-trash" aria-hidden="true"></i>
+                        </button>
+                      }
                     </div>
                   }
                 </article>
@@ -192,14 +201,14 @@
   (onHide)="cancelConfirmation()"
 >
   <div class="confirmation-body">
-    <p>Isso remove apenas o agendamento. O treino permanece no catálogo.</p>
+    <p>{{ confirmationText() }}</p>
   </div>
 
   <footer class="dialog-actions">
     <button pButton type="button" class="secondary-action" (click)="cancelConfirmation()" [disabled]="submitting()">
       Cancelar
     </button>
-    <button pButton type="button" class="danger-action" (click)="applyConfirmation()" [disabled]="submitting()">
+    <button pButton type="button" [class.danger-action]="confirmation()?.kind === 'delete'" (click)="applyConfirmation()" [disabled]="submitting()">
       {{ submitting() ? 'Processando...' : 'Confirmar' }}
     </button>
   </footer>

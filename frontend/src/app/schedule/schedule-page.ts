@@ -21,7 +21,10 @@ interface ScheduleGroup {
   entries: ScheduleEntry[];
 }
 
+type ConfirmationKind = 'complete' | 'delete';
+
 interface ConfirmationState {
+  kind: ConfirmationKind;
   entry: ScheduleEntry;
 }
 
@@ -183,15 +186,24 @@ export class SchedulePage implements OnInit {
       this.closeEditDialog();
       await this.loadData();
     } catch (error) {
+      if (this.isConflict(error)) {
+        this.errorMessage.set('Treinos já realizados não podem ser alterados ou removidos.');
+        return;
+      }
       await this.handleRequestError(error);
     } finally {
       this.submitting.set(false);
     }
   }
 
+  protected confirmComplete(entry: ScheduleEntry): void {
+    this.clearMessages();
+    this.confirmation.set({ kind: 'complete', entry });
+  }
+
   protected confirmDelete(entry: ScheduleEntry): void {
     this.clearMessages();
-    this.confirmation.set({ entry });
+    this.confirmation.set({ kind: 'delete', entry });
   }
 
   protected cancelConfirmation(): void {
@@ -209,11 +221,25 @@ export class SchedulePage implements OnInit {
     this.clearMessages();
 
     try {
-      await this.api.delete(confirmation.entry.id);
-      this.entries.update((items) => items.filter((item) => item.id !== confirmation.entry.id));
-      this.successMessage.set('Agendamento removido com sucesso.');
+      if (confirmation.kind === 'complete') {
+        await this.api.complete(confirmation.entry.id);
+        this.successMessage.set('Treino registrado como realizado.');
+        await this.loadData();
+      } else {
+        await this.api.delete(confirmation.entry.id);
+        this.entries.update((items) => items.filter((item) => item.id !== confirmation.entry.id));
+        this.successMessage.set('Agendamento removido com sucesso.');
+      }
       this.confirmation.set(null);
     } catch (error) {
+      if (confirmation.kind === 'complete' && this.isConflict(error)) {
+        this.errorMessage.set('Este treino já foi registrado como realizado.');
+        return;
+      }
+      if (confirmation.kind === 'delete' && this.isConflict(error)) {
+        this.errorMessage.set('Treinos já realizados não podem ser alterados ou removidos.');
+        return;
+      }
       await this.handleRequestError(error);
     } finally {
       this.rowActionId.set(null);
@@ -234,13 +260,32 @@ export class SchedulePage implements OnInit {
     return workout.active ? workout.name : `${workout.name} (inativo)`;
   }
 
+  protected isCompleted(entry: ScheduleEntry): boolean {
+    return Boolean(entry.completedAt);
+  }
+
   protected confirmationTitle(): string {
     const confirmation = this.confirmation();
     if (!confirmation) {
       return '';
     }
+    if (confirmation.kind === 'complete') {
+      return `Marcar ${confirmation.entry.workout.name} de ${this.formatDate(confirmation.entry.scheduledDate)} como realizado?`;
+    }
 
     return `Remover ${confirmation.entry.workout.name} da agenda de ${this.formatDate(confirmation.entry.scheduledDate)}?`;
+  }
+
+  protected confirmationText(): string {
+    const confirmation = this.confirmation();
+    if (!confirmation) {
+      return '';
+    }
+    if (confirmation.kind === 'complete') {
+      return 'Esta ação registrará o treino no Histórico e não poderá ser desfeita.';
+    }
+
+    return 'Isso remove apenas o agendamento. O treino permanece no catálogo.';
   }
 
   private async handleRequestError(error: unknown): Promise<void> {
@@ -268,6 +313,10 @@ export class SchedulePage implements OnInit {
     }
 
     this.errorMessage.set('Não foi possível concluir a operação. Tente novamente.');
+  }
+
+  private isConflict(error: unknown): boolean {
+    return error instanceof HttpErrorResponse && error.status === 409;
   }
 
   private clearMessages(): void {

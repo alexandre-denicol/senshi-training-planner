@@ -13,6 +13,7 @@ var (
 	ErrInvalidWorkout = errors.New("invalid workout")
 	ErrDuplicate      = errors.New("workout already scheduled for date")
 	ErrNotFound       = errors.New("schedule entry not found")
+	ErrCompleted      = errors.New("completed schedule entry cannot be changed")
 )
 
 type WorkoutRef struct {
@@ -25,6 +26,7 @@ type Entry struct {
 	ID            string     `json:"id"`
 	ScheduledDate string     `json:"scheduledDate"`
 	Workout       WorkoutRef `json:"workout"`
+	CompletedAt   *time.Time `json:"completedAt,omitempty"`
 	CreatedAt     time.Time  `json:"createdAt"`
 	UpdatedAt     time.Time  `json:"updatedAt"`
 }
