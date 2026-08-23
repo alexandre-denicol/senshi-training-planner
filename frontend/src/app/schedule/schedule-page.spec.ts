@@ -161,18 +161,223 @@ describe('SchedulePage', () => {
     const admin = await renderPage(adminUser, [original], [workout()], adminApi);
 
     admin.component.confirmComplete(original);
-    expect(admin.component.confirmationTitle()).toBe('Marcar Treino A de 24/08/2026 como realizado?');
-    expect(admin.component.confirmationText()).toContain('registrará o treino no Histórico');
-    await admin.component.applyConfirmation();
+    admin.fixture.detectChanges();
+    expect(admin.component.completeDialogOpen()).toBe(true);
+    expect(admin.fixture.nativeElement.textContent).toContain('Registrar treino realizado');
+    expect(admin.fixture.nativeElement.textContent).toContain('Treino A');
+    expect(admin.fixture.nativeElement.textContent).toContain('24/08/2026');
+    expect(admin.fixture.nativeElement.textContent).toContain('Após registrar o treino como realizado');
+    await admin.component.completeEntry();
 
-    expect(adminApi.completed).toEqual(['entry-1']);
+    expect(adminApi.completed).toEqual([{ id: 'entry-1', details: {} }]);
 
     const professorApi = new FakeScheduleApi([original]);
     const professor = await renderPage(professorUser, [original], [workout()], professorApi);
     professor.component.confirmComplete(original);
-    await professor.component.applyConfirmation();
+    await professor.component.completeEntry();
 
-    expect(professorApi.completed).toEqual(['entry-1']);
+    expect(professorApi.completed).toEqual([{ id: 'entry-1', details: {} }]);
+  });
+
+  it('submits optional participant details while preserving count/name independence', async () => {
+    const original = entry({ id: 'entry-1' });
+    const api = new FakeScheduleApi([original]);
+    const { component } = await renderPage(adminUser, [original], [workout()], api);
+
+    component.confirmComplete(original);
+    component.completionForm.participantCount = '0';
+    await component.completeEntry();
+    expect(api.completed.at(-1)).toEqual({ id: 'entry-1', details: { participantCount: 0 } });
+
+    component.confirmComplete(original);
+    component.completionForm.participantName = ' João ';
+    component.addParticipantName();
+    component.completionForm.participantName = 'Maria';
+    component.addParticipantName();
+    await component.completeEntry();
+    expect(api.completed.at(-1)).toEqual({ id: 'entry-1', details: { participantNames: ['João', 'Maria'] } });
+
+    component.confirmComplete(original);
+    component.completionForm.participantCount = '1';
+    component.completionForm.participantNames = ['João', 'Maria'];
+    await component.completeEntry();
+    expect(api.completed.at(-1)).toEqual({ id: 'entry-1', details: { participantCount: 1, participantNames: ['João', 'Maria'] } });
+  });
+
+  it('manages participant names and validates completion form', async () => {
+    const original = entry({ id: 'entry-1' });
+    const { fixture, component } = await renderPage(adminUser, [original], [workout()]);
+
+    component.confirmComplete(original);
+    component.completionForm.participantName = ' João ';
+    component.addParticipantName();
+    component.completionForm.participantName = 'João';
+    component.addParticipantName();
+    expect(component.completionForm.participantNames).toEqual(['João', 'João']);
+
+    component.removeParticipantName(0);
+    expect(component.completionForm.participantNames).toEqual(['João']);
+
+    component.completionForm.participantCount = '2.5';
+    expect(component.completionFormValid()).toBe(false);
+    component.completionForm.participantCount = '501';
+    expect(component.completionFormValid()).toBe(false);
+    component.completionForm.participantCount = '';
+    expect(component.completionFormValid()).toBe(true);
+
+    component.completionForm.participantName = '   ';
+    component.addParticipantName();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Informe o nome antes de adicionar.');
+  });
+
+  it('shows added participant names in the dialog and keeps order including duplicates', async () => {
+    const original = entry({ id: 'entry-1' });
+    const api = new FakeScheduleApi([original]);
+    const { fixture, component } = await renderPage(adminUser, [original], [workout()], api);
+
+    component.confirmComplete(original);
+    fixture.detectChanges();
+
+    setInputValue(fixture.nativeElement.querySelector('input[name="participant-name"]'), 'Alexandre Denicol');
+    clickButton(fixture.nativeElement, 'Adicionar');
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Participantes adicionados');
+    expect(fixture.nativeElement.textContent).toContain('1.');
+    expect(fixture.nativeElement.textContent).toContain('Alexandre Denicol');
+    expect((fixture.nativeElement.querySelector('input[name="participant-name"]') as HTMLInputElement).value).toBe('');
+    expect(api.completed).toHaveLength(0);
+
+    setInputValue(fixture.nativeElement.querySelector('input[name="participant-name"]'), 'Alan Fogaça');
+    clickButton(fixture.nativeElement, 'Adicionar');
+    setInputValue(fixture.nativeElement.querySelector('input[name="participant-name"]'), 'Alan Fogaça');
+    clickButton(fixture.nativeElement, 'Adicionar');
+    fixture.detectChanges();
+
+    const text = fixture.nativeElement.textContent;
+    expect(text.indexOf('Alexandre Denicol')).toBeLessThan(text.indexOf('Alan Fogaça'));
+    expect(component.completionForm.participantNames).toEqual(['Alexandre Denicol', 'Alan Fogaça', 'Alan Fogaça']);
+  });
+
+  it('adds participant with ENTER without completing training', async () => {
+    const original = entry({ id: 'entry-1' });
+    const api = new FakeScheduleApi([original]);
+    const { fixture, component } = await renderPage(adminUser, [original], [workout()], api);
+
+    component.confirmComplete(original);
+    fixture.detectChanges();
+    const input = fixture.nativeElement.querySelector('input[name="participant-name"]') as HTMLInputElement;
+    setInputValue(input, 'Alexandre Denicol');
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    fixture.detectChanges();
+
+    expect(component.completionForm.participantNames).toEqual(['Alexandre Denicol']);
+    expect(fixture.nativeElement.textContent).toContain('Alexandre Denicol');
+    expect(api.completed).toHaveLength(0);
+  });
+
+  it('removes only the selected participant without completing or changing count', async () => {
+    const original = entry({ id: 'entry-1' });
+    const api = new FakeScheduleApi([original]);
+    const { fixture, component } = await renderPage(adminUser, [original], [workout()], api);
+
+    component.confirmComplete(original);
+    component.completionForm = {
+      participantCount: '10',
+      participantName: '',
+      participantNames: ['Alexandre Denicol', 'Alan Fogaça', 'Maria'],
+    };
+    fixture.detectChanges();
+
+    const removeAlan = fixture.nativeElement.querySelector('button[aria-label="Remover participante Alan Fogaça"]') as HTMLButtonElement;
+    removeAlan.click();
+    fixture.detectChanges();
+
+    expect(component.completionForm.participantCount).toBe('10');
+    expect(component.completionForm.participantNames).toEqual(['Alexandre Denicol', 'Maria']);
+    expect(fixture.nativeElement.textContent).toContain('Alexandre Denicol');
+    expect(fixture.nativeElement.textContent).toContain('Maria');
+    expect(fixture.nativeElement.textContent).not.toContain('Alan Fogaça');
+    expect(api.completed).toHaveLength(0);
+  });
+
+  it('final completion button submits exactly once with participant details and refreshes agenda', async () => {
+    const original = entry({ id: 'entry-1' });
+    const api = new FakeScheduleApi([original]);
+    const { fixture, component } = await renderPage(adminUser, [original], [workout()], api);
+
+    component.confirmComplete(original);
+    component.completionForm = {
+      participantCount: 2,
+      participantName: '',
+      participantNames: ['Alexandre Denicol', 'Alan Fogaça'],
+    };
+    const previousLoadCount = api.ranges.length;
+    fixture.detectChanges();
+
+    clickButton(fixture.nativeElement, 'Registrar como realizado');
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(api.completed).toEqual([
+      {
+        id: 'entry-1',
+        details: {
+          participantCount: 2,
+          participantNames: ['Alexandre Denicol', 'Alan Fogaça'],
+        },
+      },
+    ]);
+    expect(api.ranges.length).toBeGreaterThan(previousLoadCount);
+    expect(component.completeDialogOpen()).toBe(false);
+    expect(component.completionForm).toEqual({ participantCount: '', participantName: '', participantNames: [] });
+    expect(fixture.nativeElement.textContent).toContain('Treino registrado como realizado.');
+  });
+
+  it('empty details completion omits missing count instead of converting it to zero', async () => {
+    const original = entry({ id: 'entry-1' });
+    const api = new FakeScheduleApi([original]);
+    const { fixture, component } = await renderPage(adminUser, [original], [workout()], api);
+
+    component.confirmComplete(original);
+    fixture.detectChanges();
+    clickButton(fixture.nativeElement, 'Registrar como realizado');
+    await fixture.whenStable();
+
+    expect(api.completed[0]).toEqual({ id: 'entry-1', details: {} });
+  });
+
+  it('prevents duplicate completion while request is pending', async () => {
+    const original = entry({ id: 'entry-1' });
+    const api = new FakeScheduleApi([original]);
+    api.completeGate = pendingPromise();
+    const { component } = await renderPage(adminUser, [original], [workout()], api);
+
+    component.confirmComplete(original);
+    const first = component.completeEntry();
+    const second = component.completeEntry();
+
+    expect(api.completed).toHaveLength(1);
+    api.completeGate.resolve();
+    await first;
+    await second;
+    expect(api.completed).toHaveLength(1);
+  });
+
+  it('failed completion keeps dialog open and re-enables submit', async () => {
+    const original = entry({ id: 'entry-1' });
+    const api = new FakeScheduleApi([original]);
+    api.completeError = new HttpErrorResponse({ status: 500, statusText: 'Server Error' });
+    const { fixture, component } = await renderPage(adminUser, [original], [workout()], api);
+
+    component.confirmComplete(original);
+    await component.completeEntry();
+    fixture.detectChanges();
+
+    expect(component.completeDialogOpen()).toBe(true);
+    expect(component.submitting()).toBe(false);
+    expect(fixture.nativeElement.textContent).toContain('Não foi possível registrar o treino como realizado. Tente novamente.');
   });
 
   it('shows completed state and hides impossible actions', async () => {
@@ -193,7 +398,7 @@ describe('SchedulePage', () => {
     const { fixture, component } = await renderPage(adminUser, [original], [workout()], api);
 
     component.confirmComplete(original);
-    await component.applyConfirmation();
+    await component.completeEntry();
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Este treino já foi registrado como realizado.');
 
@@ -223,6 +428,11 @@ describe('SchedulePage', () => {
     component.editForm = { workoutId: 'workout-id', scheduledDate: '2026-08-25' };
     component.closeEditDialog();
     expect(component.editForm).toEqual({ scheduledDate: '', workoutId: '' });
+
+    component.confirmComplete(original);
+    component.completionForm = { participantCount: '12', participantName: 'Maria', participantNames: ['João'] };
+    component.closeCompleteDialog();
+    expect(component.completionForm).toEqual({ participantCount: '', participantName: '', participantNames: [] });
   });
 });
 
@@ -289,11 +499,12 @@ class FakeScheduleApi {
   created: Array<{ workoutId: string; scheduledDate: string }> = [];
   updated: Array<{ id: string; request: { workoutId: string; scheduledDate: string } }> = [];
   deleted: string[] = [];
-  completed: string[] = [];
+  completed: Array<{ id: string; details: unknown }> = [];
   createError: unknown = null;
   updateError: unknown = null;
   deleteError: unknown = null;
   completeError: unknown = null;
+  completeGate: DeferredPromise | null = null;
 
   constructor(private entries: ScheduleEntry[]) {}
 
@@ -339,14 +550,49 @@ class FakeScheduleApi {
     this.entries = this.entries.filter((item) => item.id !== id);
   }
 
-  async complete(id: string): Promise<unknown> {
-    this.completed.push(id);
+  async complete(id: string, details: unknown = {}): Promise<unknown> {
+    this.completed.push({ id, details });
     if (this.completeError) {
       throw this.completeError;
+    }
+    if (this.completeGate) {
+      await this.completeGate.promise;
     }
     this.entries = this.entries.map((item) => item.id === id ? { ...item, completedAt: '2026-08-23T15:32:00Z' } : item);
     return {};
   }
+}
+
+interface DeferredPromise {
+  promise: Promise<void>;
+  resolve: () => void;
+}
+
+function pendingPromise(): DeferredPromise {
+  let resolve: () => void = () => undefined;
+  const promise = new Promise<void>((resolver) => {
+    resolve = resolver;
+  });
+
+  return { promise, resolve };
+}
+
+function setInputValue(input: HTMLInputElement | null, value: string): void {
+  if (!input) {
+    throw new Error('input not found');
+  }
+
+  input.value = value;
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+function clickButton(root: HTMLElement, text: string): void {
+  const button = Array.from(root.querySelectorAll('button')).find((candidate) => candidate.textContent?.includes(text));
+  if (!button) {
+    throw new Error(`button not found: ${text}`);
+  }
+
+  (button as HTMLButtonElement).click();
 }
 
 class FakeWorkoutApi {

@@ -13,8 +13,8 @@ describe('HistoryPage', () => {
 
   it('shows populated history grouped newest first with snapshot values', async () => {
     const items = [
-      historyItem({ id: 'older', trainingDate: '2026-08-20', workoutName: 'Nome Antigo', completedByName: 'Professor Snapshot', blockCount: 4 }),
-      historyItem({ id: 'newer', trainingDate: '2026-08-24', workoutName: 'Treino Snapshot', completedByName: 'Alexandre', blockCount: 1 }),
+      historyItem({ id: 'older', trainingDate: '2026-08-20', workoutName: 'Nome Antigo', completedByName: 'Professor Snapshot', blockCount: 4, participantCount: 2 }),
+      historyItem({ id: 'newer', trainingDate: '2026-08-24', workoutName: 'Treino Snapshot', completedByName: 'Alexandre', blockCount: 1, participantCount: 1 }),
     ];
     const { fixture } = await renderPage(items);
     const text = fixture.nativeElement.textContent;
@@ -26,7 +26,15 @@ describe('HistoryPage', () => {
     expect(text).toContain('Treino Snapshot');
     expect(text).toContain('Realizado por Alexandre');
     expect(text).toContain('4 blocos');
+    expect(text).toContain('1 aluno');
+    expect(text).toContain('2 alunos');
     expect(text.indexOf('Treino Snapshot')).toBeLessThan(text.indexOf('Nome Antigo'));
+  });
+
+  it('does not invent zero participants when participant count is null', async () => {
+    const { fixture } = await renderPage([historyItem({ participantCount: null })]);
+
+    expect(fixture.nativeElement.textContent).not.toContain('0 alunos');
   });
 
   it('formats DATE values without timezone shifting and formats completion timestamp', async () => {
@@ -63,6 +71,8 @@ describe('HistoryPage', () => {
         { position: 1, blockName: 'Bloco Snapshot A', categoryName: 'Categoria Snapshot A' },
         { position: 2, blockName: 'Bloco Snapshot B', categoryName: 'Categoria Snapshot B' },
       ],
+      participantCount: 12,
+      participantNames: ['João', 'Maria', 'Pedro'],
     }));
     const { fixture, component } = await renderPage(api.items, api);
 
@@ -74,7 +84,37 @@ describe('HistoryPage', () => {
     expect(text).toContain('Detalhes do histórico');
     expect(text).toContain('Bloco Snapshot A');
     expect(text).toContain('Categoria Snapshot A');
+    expect(text).toContain('Participação');
+    expect(text).toContain('Quantidade: 12 alunos');
+    expect(text).toContain('João');
+    expect(text.indexOf('João')).toBeLessThan(text.indexOf('Maria'));
     expect(text.indexOf('Bloco Snapshot A')).toBeLessThan(text.indexOf('Bloco Snapshot B'));
+  });
+
+  it('renders count-only, names-only and missing participation detail states', async () => {
+    const api = new FakeHistoryApi([
+      historyItem({ id: 'count-only' }),
+      historyItem({ id: 'names-only' }),
+      historyItem({ id: 'old-record' }),
+    ]);
+    api.details.set('count-only', historyDetail({ id: 'count-only', participantCount: 1, participantNames: [] }));
+    api.details.set('names-only', historyDetail({ id: 'names-only', participantCount: null, participantNames: ['João', 'Maria'] }));
+    api.details.set('old-record', historyDetail({ id: 'old-record', participantCount: null, participantNames: [] }));
+    const { fixture, component } = await renderPage(api.items, api);
+
+    await component.openDetail(api.items[0]);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Quantidade: 1 aluno');
+
+    await component.openDetail(api.items[1]);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Participantes:');
+    expect(fixture.nativeElement.textContent).toContain('João');
+    expect(fixture.nativeElement.textContent).toContain('Maria');
+
+    await component.openDetail(api.items[2]);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Participação não informada.');
   });
 
   it('handles invalid range and missing detail errors safely', async () => {
@@ -121,6 +161,7 @@ function historyItem(overrides: Partial<HistoryListItem> = {}): HistoryListItem 
     trainingDate: '2026-08-24',
     workoutName: 'Treino Snapshot',
     blockCount: 2,
+    participantCount: null,
     completedByName: 'Professor Snapshot',
     completedAt: '2026-08-24T15:32:00Z',
     scheduleEntryId: 'schedule-id',
@@ -133,6 +174,8 @@ function historyDetail(overrides: Partial<HistoryDetail> = {}): HistoryDetail {
     id: 'history-id',
     trainingDate: '2026-08-24',
     workoutName: 'Treino Snapshot',
+    participantCount: null,
+    participantNames: [],
     completedByName: 'Professor Snapshot',
     completedAt: '2026-08-24T15:32:00Z',
     blocks: [

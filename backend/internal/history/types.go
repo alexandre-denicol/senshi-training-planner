@@ -9,6 +9,9 @@ import (
 )
 
 const MaxRangeDays = 93
+const MaxParticipantCount = 500
+const MaxParticipantNames = 100
+const MaxParticipantNameChars = 120
 
 var (
 	ErrInvalidRequest      = errors.New("invalid request")
@@ -19,22 +22,25 @@ var (
 )
 
 type ListItem struct {
-	ID              string    `json:"id"`
-	TrainingDate    string    `json:"trainingDate"`
-	WorkoutName     string    `json:"workoutName"`
-	BlockCount      int       `json:"blockCount"`
-	CompletedByName string    `json:"completedByName"`
-	CompletedAt     time.Time `json:"completedAt"`
-	ScheduleEntryID string    `json:"scheduleEntryId"`
+	ID               string    `json:"id"`
+	TrainingDate     string    `json:"trainingDate"`
+	WorkoutName      string    `json:"workoutName"`
+	BlockCount       int       `json:"blockCount"`
+	ParticipantCount *int      `json:"participantCount"`
+	CompletedByName  string    `json:"completedByName"`
+	CompletedAt      time.Time `json:"completedAt"`
+	ScheduleEntryID  string    `json:"scheduleEntryId"`
 }
 
 type Detail struct {
-	ID              string    `json:"id"`
-	TrainingDate    string    `json:"trainingDate"`
-	WorkoutName     string    `json:"workoutName"`
-	CompletedByName string    `json:"completedByName"`
-	CompletedAt     time.Time `json:"completedAt"`
-	Blocks          []Block   `json:"blocks"`
+	ID               string    `json:"id"`
+	TrainingDate     string    `json:"trainingDate"`
+	WorkoutName      string    `json:"workoutName"`
+	ParticipantCount *int      `json:"participantCount"`
+	ParticipantNames []string  `json:"participantNames"`
+	CompletedByName  string    `json:"completedByName"`
+	CompletedAt      time.Time `json:"completedAt"`
+	Blocks           []Block   `json:"blocks"`
 }
 
 type Block struct {
@@ -46,11 +52,16 @@ type Block struct {
 type Store interface {
 	ListHistory(ctx context.Context, from string, to string) ([]ListItem, error)
 	GetHistory(ctx context.Context, id string) (Detail, error)
-	CompleteScheduleEntry(ctx context.Context, historyID string, scheduleEntryID string, completedBy auth.PublicUser, completedAt time.Time) (Detail, error)
+	CompleteScheduleEntry(ctx context.Context, historyID string, scheduleEntryID string, completedBy auth.PublicUser, completedAt time.Time, details CompletionDetails) (Detail, error)
 }
 
 type ServiceAPI interface {
 	List(ctx context.Context, from string, to string) ([]ListItem, error)
 	Get(ctx context.Context, id string) (Detail, error)
-	Complete(ctx context.Context, scheduleEntryID string, completedBy auth.PublicUser) (Detail, error)
+	Complete(ctx context.Context, scheduleEntryID string, completedBy auth.PublicUser, details CompletionDetails) (Detail, error)
+}
+
+type CompletionDetails struct {
+	ParticipantCount *int
+	ParticipantNames []string
 }

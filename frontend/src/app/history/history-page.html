@@ -48,6 +48,9 @@
                   </div>
                   <div class="history-meta">
                     <span>{{ blockCountLabel(item) }}</span>
+                    @if (item.participantCount !== null) {
+                      <span>{{ participantCountLabel(item.participantCount) }}</span>
+                    }
                     <span>{{ formatCompletedTime(item.completedAt) }}</span>
                   </div>
                 </button>
@@ -92,6 +95,27 @@
           </div>
         </dl>
       </header>
+
+      <section class="participation-section">
+        <h3>Participação</h3>
+        @if (hasParticipation(detail)) {
+          @if (detail.participantCount !== null) {
+            <p>Quantidade: {{ participantCountLabel(detail.participantCount) }}</p>
+          }
+          @if (detail.participantNames.length > 0) {
+            <div>
+              <p>Participantes:</p>
+              <ol>
+                @for (name of detail.participantNames; track $index) {
+                  <li>{{ name }}</li>
+                }
+              </ol>
+            </div>
+          }
+        } @else {
+          <p>Participação não informada.</p>
+        }
+      </section>
 
       <ol class="snapshot-blocks">
         @for (block of detail.blocks; track block.position) {

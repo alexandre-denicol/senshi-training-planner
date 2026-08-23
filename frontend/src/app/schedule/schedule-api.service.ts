@@ -22,6 +22,11 @@ export interface ScheduleRequest {
   scheduledDate: string;
 }
 
+export interface CompletionDetails {
+  participantCount?: number | null;
+  participantNames?: string[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class ScheduleApiService {
   private readonly http = inject(HttpClient);
@@ -52,9 +57,9 @@ export class ScheduleApiService {
     );
   }
 
-  complete(id: string): Promise<unknown> {
+  complete(id: string, details: CompletionDetails = {}): Promise<unknown> {
     return firstValueFrom(
-      this.http.post<unknown>(`${this.baseUrl}/${id}/complete`, null, { withCredentials: true }),
+      this.http.post<unknown>(`${this.baseUrl}/${id}/complete`, details, { withCredentials: true }),
     );
   }
 }

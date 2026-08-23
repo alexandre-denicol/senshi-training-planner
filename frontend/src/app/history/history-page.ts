@@ -123,6 +123,18 @@ export class HistoryPage implements OnInit {
     return item.blockCount === 1 ? '1 bloco' : `${item.blockCount} blocos`;
   }
 
+  protected participantCountLabel(count: number | null | undefined): string {
+    if (count === null || count === undefined) {
+      return '';
+    }
+
+    return count === 1 ? '1 aluno' : `${count} alunos`;
+  }
+
+  protected hasParticipation(detail: HistoryDetail): boolean {
+    return detail.participantCount !== null || detail.participantNames.length > 0;
+  }
+
   private async handleRequestError(error: unknown): Promise<void> {
     if (error instanceof HttpErrorResponse) {
       if (error.status === 401) {

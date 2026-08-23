@@ -8,7 +8,7 @@ import { DialogModule } from 'primeng/dialog';
 import { InputTextModule } from 'primeng/inputtext';
 import { AuthService } from '../auth/auth.service';
 import { WorkoutApiService, WorkoutListItem } from '../workouts/workout-api.service';
-import { ScheduleApiService, ScheduleEntry, ScheduleWorkout } from './schedule-api.service';
+import { CompletionDetails, ScheduleApiService, ScheduleEntry, ScheduleWorkout } from './schedule-api.service';
 
 interface ScheduleForm {
   scheduledDate: string;
@@ -21,11 +21,14 @@ interface ScheduleGroup {
   entries: ScheduleEntry[];
 }
 
-type ConfirmationKind = 'complete' | 'delete';
-
 interface ConfirmationState {
-  kind: ConfirmationKind;
   entry: ScheduleEntry;
+}
+
+interface CompletionForm {
+  participantCount: string | number | null;
+  participantName: string;
+  participantNames: string[];
 }
 
 @Component({
@@ -51,6 +54,7 @@ export class SchedulePage implements OnInit {
   protected readonly errorMessage = signal('');
   protected readonly successMessage = signal('');
   protected readonly confirmation = signal<ConfirmationState | null>(null);
+  protected readonly completionFormError = signal('');
   protected readonly isAdmin = computed(() => this.auth.currentUser()?.role === 'ADMIN');
   protected readonly hasEntries = computed(() => this.entries().length > 0);
   protected readonly activeWorkouts = computed(() => this.workouts().filter((workout) => workout.active));
@@ -60,9 +64,12 @@ export class SchedulePage implements OnInit {
 
   protected createDialogOpen = false;
   protected editDialogOpen = false;
+  protected readonly completeDialogOpen = signal(false);
   protected selectedEntry: ScheduleEntry | null = null;
+  protected completionEntry: ScheduleEntry | null = null;
   protected createForm = this.emptyForm();
   protected editForm = this.emptyForm();
+  protected completionForm = this.emptyCompletionForm();
 
   async ngOnInit(): Promise<void> {
     await this.loadData();
@@ -198,12 +205,101 @@ export class SchedulePage implements OnInit {
 
   protected confirmComplete(entry: ScheduleEntry): void {
     this.clearMessages();
-    this.confirmation.set({ kind: 'complete', entry });
+    this.completionEntry = entry;
+    this.completionForm = this.emptyCompletionForm();
+    this.completeDialogOpen.set(true);
+  }
+
+  protected closeCompleteDialog(): void {
+    this.completeDialogOpen.set(false);
+    this.completionEntry = null;
+    this.completionForm = this.emptyCompletionForm();
+    this.completionFormError.set('');
+  }
+
+  protected addParticipantName(input?: HTMLInputElement): void {
+    const name = (input?.value ?? this.completionForm.participantName).trim();
+    this.completionFormError.set('');
+
+    if (name === '') {
+      this.completionFormError.set('Informe o nome antes de adicionar.');
+      return;
+    }
+    if (Array.from(name).length > 120) {
+      this.completionFormError.set('Use no máximo 120 caracteres por nome.');
+      return;
+    }
+    if (this.completionForm.participantNames.length >= 100) {
+      this.completionFormError.set('Use no máximo 100 participantes registrados.');
+      return;
+    }
+
+    this.completionForm = {
+      ...this.completionForm,
+      participantName: '',
+      participantNames: [...this.completionForm.participantNames, name],
+    };
+    if (input) {
+      input.value = '';
+    }
+  }
+
+  protected addParticipantNameFromKeyboard(event: Event, input: HTMLInputElement): void {
+    event.preventDefault();
+    this.addParticipantName(input);
+  }
+
+  protected removeParticipantName(index: number): void {
+    this.completionForm = {
+      ...this.completionForm,
+      participantNames: this.completionForm.participantNames.filter((_, currentIndex) => currentIndex !== index),
+    };
+  }
+
+  protected completionFormValid(): boolean {
+    const count = this.completionCountText();
+    if (count === '') {
+      return true;
+    }
+
+    const value = Number(count);
+    return Number.isInteger(value) && value >= 0 && value <= 500;
+  }
+
+  protected async completeEntry(): Promise<void> {
+    if (!this.completionEntry || !this.completionFormValid() || this.submitting()) {
+      return;
+    }
+
+    this.submitting.set(true);
+    this.rowActionId.set(this.completionEntry.id);
+    this.clearMessages();
+    this.completionFormError.set('');
+
+    try {
+      await this.api.complete(this.completionEntry.id, this.completionPayload());
+      this.successMessage.set('Treino registrado como realizado.');
+      this.closeCompleteDialog();
+      await this.loadData();
+    } catch (error) {
+      if (this.isConflict(error)) {
+        this.errorMessage.set('Este treino já foi registrado como realizado.');
+        return;
+      }
+      if (error instanceof HttpErrorResponse && error.status === 400) {
+        this.errorMessage.set('Verifique os dados informados.');
+        return;
+      }
+      this.errorMessage.set('Não foi possível registrar o treino como realizado. Tente novamente.');
+    } finally {
+      this.rowActionId.set(null);
+      this.submitting.set(false);
+    }
   }
 
   protected confirmDelete(entry: ScheduleEntry): void {
     this.clearMessages();
-    this.confirmation.set({ kind: 'delete', entry });
+    this.confirmation.set({ entry });
   }
 
   protected cancelConfirmation(): void {
@@ -221,22 +317,12 @@ export class SchedulePage implements OnInit {
     this.clearMessages();
 
     try {
-      if (confirmation.kind === 'complete') {
-        await this.api.complete(confirmation.entry.id);
-        this.successMessage.set('Treino registrado como realizado.');
-        await this.loadData();
-      } else {
-        await this.api.delete(confirmation.entry.id);
-        this.entries.update((items) => items.filter((item) => item.id !== confirmation.entry.id));
-        this.successMessage.set('Agendamento removido com sucesso.');
-      }
+      await this.api.delete(confirmation.entry.id);
+      this.entries.update((items) => items.filter((item) => item.id !== confirmation.entry.id));
+      this.successMessage.set('Agendamento removido com sucesso.');
       this.confirmation.set(null);
     } catch (error) {
-      if (confirmation.kind === 'complete' && this.isConflict(error)) {
-        this.errorMessage.set('Este treino já foi registrado como realizado.');
-        return;
-      }
-      if (confirmation.kind === 'delete' && this.isConflict(error)) {
+      if (this.isConflict(error)) {
         this.errorMessage.set('Treinos já realizados não podem ser alterados ou removidos.');
         return;
       }
@@ -269,9 +355,6 @@ export class SchedulePage implements OnInit {
     if (!confirmation) {
       return '';
     }
-    if (confirmation.kind === 'complete') {
-      return `Marcar ${confirmation.entry.workout.name} de ${this.formatDate(confirmation.entry.scheduledDate)} como realizado?`;
-    }
 
     return `Remover ${confirmation.entry.workout.name} da agenda de ${this.formatDate(confirmation.entry.scheduledDate)}?`;
   }
@@ -280,9 +363,6 @@ export class SchedulePage implements OnInit {
     const confirmation = this.confirmation();
     if (!confirmation) {
       return '';
-    }
-    if (confirmation.kind === 'complete') {
-      return 'Esta ação registrará o treino no Histórico e não poderá ser desfeita.';
     }
 
     return 'Isso remove apenas o agendamento. O treino permanece no catálogo.';
@@ -326,6 +406,32 @@ export class SchedulePage implements OnInit {
 
   private emptyForm(): ScheduleForm {
     return { scheduledDate: '', workoutId: '' };
+  }
+
+  private emptyCompletionForm(): CompletionForm {
+    return { participantCount: '', participantName: '', participantNames: [] };
+  }
+
+  private completionPayload(): CompletionDetails {
+    const payload: CompletionDetails = {};
+    const count = this.completionCountText();
+    if (count !== '') {
+      payload.participantCount = Number(count);
+    }
+    if (this.completionForm.participantNames.length > 0) {
+      payload.participantNames = this.completionForm.participantNames;
+    }
+
+    return payload;
+  }
+
+  private completionCountText(): string {
+    const count = this.completionForm.participantCount;
+    if (count === null || count === undefined) {
+      return '';
+    }
+
+    return String(count).trim();
   }
 }
 

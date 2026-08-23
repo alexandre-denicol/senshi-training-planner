@@ -2,6 +2,7 @@ package history
 
 import (
 	"errors"
+	"io"
 	"net/http"
 	"strings"
 
@@ -11,6 +12,11 @@ import (
 
 type Handler struct {
 	service ServiceAPI
+}
+
+type completeRequest struct {
+	ParticipantCount *int     `json:"participantCount"`
+	ParticipantNames []string `json:"participantNames"`
 }
 
 func NewHandler(service ServiceAPI) *Handler {
@@ -52,7 +58,13 @@ func (h *Handler) CompleteSchedule(w http.ResponseWriter, r *http.Request, sched
 		return
 	}
 
-	detail, err := h.service.Complete(r.Context(), scheduleEntryID, user)
+	details, err := readCompleteRequest(w, r)
+	if err != nil {
+		httpapi.WriteError(w, http.StatusBadRequest, "invalid request")
+		return
+	}
+
+	detail, err := h.service.Complete(r.Context(), scheduleEntryID, user, details)
 	writeCompletionResult(w, detail, err)
 }
 
@@ -88,11 +100,28 @@ func writeCompletionResult(w http.ResponseWriter, detail Detail, err error) {
 		httpapi.WriteError(w, http.StatusNotFound, "schedule entry not found")
 	case errors.Is(err, ErrAlreadyCompleted):
 		httpapi.WriteError(w, http.StatusConflict, "training already completed")
-	case errors.Is(err, ErrInvalidRequest), errors.Is(err, ErrSnapshotUnavailable):
+	case errors.Is(err, ErrInvalidRequest):
+		httpapi.WriteError(w, http.StatusBadRequest, "invalid request")
+	case errors.Is(err, ErrSnapshotUnavailable):
 		httpapi.WriteError(w, http.StatusInternalServerError, "internal server error")
 	default:
 		httpapi.WriteError(w, http.StatusInternalServerError, "internal server error")
 	}
+}
+
+func readCompleteRequest(w http.ResponseWriter, r *http.Request) (CompletionDetails, error) {
+	var request completeRequest
+	if err := httpapi.ReadJSON(w, r, &request); err != nil {
+		if errors.Is(err, io.EOF) {
+			return CompletionDetails{}, nil
+		}
+		return CompletionDetails{}, err
+	}
+
+	return CompletionDetails{
+		ParticipantCount: request.ParticipantCount,
+		ParticipantNames: request.ParticipantNames,
+	}, nil
 }
 
 func resourceSegments(path string) []string {

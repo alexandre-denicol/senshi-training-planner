@@ -192,6 +192,102 @@
 </ng-template>
 
 <p-dialog
+  header="Registrar treino realizado"
+  [visible]="completeDialogOpen()"
+  [modal]="true"
+  [draggable]="false"
+  [resizable]="false"
+  styleClass="schedule-dialog"
+  (onHide)="closeCompleteDialog()"
+>
+  @if (completionEntry; as entry) {
+    <form class="dialog-form completion-form" (ngSubmit)="completeEntry()">
+      <div class="completion-summary">
+        <h2>{{ entry.workout.name }}</h2>
+        <p>{{ formatDate(entry.scheduledDate) }}</p>
+      </div>
+
+      <label>
+        <span>Quantidade de alunos</span>
+        <input
+          #participantCountInput
+          pInputText
+          type="number"
+          name="participant-count"
+          inputmode="numeric"
+          min="0"
+          max="500"
+          step="1"
+          autocomplete="off"
+          [value]="completionForm.participantCount ?? ''"
+          (input)="completionForm.participantCount = participantCountInput.value"
+        />
+      </label>
+
+      <div class="participant-editor">
+        <span class="field-label">Participantes (opcional)</span>
+        <div class="participant-add-row">
+          <input
+            #participantNameInput
+            pInputText
+            type="text"
+            name="participant-name"
+            maxlength="120"
+            autocomplete="off"
+            aria-label="Nome do participante"
+            [value]="completionForm.participantName"
+            (input)="completionForm.participantName = participantNameInput.value"
+            (keydown.enter)="addParticipantNameFromKeyboard($event, participantNameInput)"
+          />
+          <button pButton type="button" class="secondary-action" (click)="addParticipantName(participantNameInput)" [disabled]="submitting()">
+            <i class="pi pi-plus" aria-hidden="true"></i>
+            <span>Adicionar</span>
+          </button>
+        </div>
+
+        @if (completionForm.participantNames.length > 0) {
+          <span class="participant-list-title">Participantes adicionados</span>
+          <ol class="participant-list">
+            @for (name of completionForm.participantNames; track $index) {
+              <li>
+                <span class="participant-position">{{ $index + 1 }}.</span>
+                <span class="participant-name">{{ name }}</span>
+                <button
+                  pButton
+                  type="button"
+                  class="icon-action danger"
+                  [attr.aria-label]="'Remover participante ' + name"
+                  title="Remover"
+                  (click)="removeParticipantName($index)"
+                  [disabled]="submitting()"
+                >
+                  <i class="pi pi-times" aria-hidden="true"></i>
+                </button>
+              </li>
+            }
+          </ol>
+        }
+      </div>
+
+      @if (completionFormError()) {
+        <p class="dialog-error" role="alert">{{ completionFormError() }}</p>
+      }
+
+      <p class="irreversible-note">Após registrar o treino como realizado, essas informações não poderão ser alteradas.</p>
+
+      <footer class="dialog-actions">
+        <button pButton type="button" class="secondary-action" (click)="closeCompleteDialog()" [disabled]="submitting()">
+          Cancelar
+        </button>
+        <button pButton type="button" (click)="completeEntry()" [disabled]="!completionFormValid() || submitting()">
+          {{ submitting() ? 'Registrando...' : 'Registrar como realizado' }}
+        </button>
+      </footer>
+    </form>
+  }
+</p-dialog>
+
+<p-dialog
   [header]="confirmationTitle()"
   [visible]="confirmation() !== null"
   [modal]="true"
@@ -208,7 +304,7 @@
     <button pButton type="button" class="secondary-action" (click)="cancelConfirmation()" [disabled]="submitting()">
       Cancelar
     </button>
-    <button pButton type="button" [class.danger-action]="confirmation()?.kind === 'delete'" (click)="applyConfirmation()" [disabled]="submitting()">
+    <button pButton type="button" class="danger-action" (click)="applyConfirmation()" [disabled]="submitting()">
       {{ submitting() ? 'Processando...' : 'Confirmar' }}
     </button>
   </footer>
