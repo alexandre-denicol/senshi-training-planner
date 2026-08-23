@@ -1,0 +1,237 @@
+<section class="categories-page" aria-labelledby="categories-title">
+  <header class="page-header">
+    <div>
+      <h1 id="categories-title">Categorias</h1>
+      <p>Organize as categorias utilizadas no catálogo de treinos.</p>
+    </div>
+
+    <button
+      pButton
+      type="button"
+      class="primary-action"
+      (click)="openCreateDialog()"
+    >
+      <i class="pi pi-plus" aria-hidden="true"></i>
+      <span>Nova categoria</span>
+    </button>
+  </header>
+
+  @if (successMessage()) {
+    <p class="feedback success" role="status">{{ successMessage() }}</p>
+  }
+
+  @if (errorMessage()) {
+    <p class="feedback error" role="alert">{{ errorMessage() }}</p>
+  }
+
+  <div class="surface">
+    @if (loading()) {
+      <div class="loading-state" role="status" aria-label="Carregando categorias">
+        <span class="loading-indicator" aria-hidden="true"></span>
+      </div>
+    } @else if (!hasCategories()) {
+      <div class="empty-list">
+        <p>Nenhuma categoria cadastrada.</p>
+        <button pButton type="button" (click)="openCreateDialog()">
+          <i class="pi pi-plus" aria-hidden="true"></i>
+          <span>Nova categoria</span>
+        </button>
+      </div>
+    } @else {
+      <table class="desktop-table">
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>Status</th>
+            <th>Cadastro</th>
+            <th class="actions-heading">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (category of categories(); track category.id) {
+            <tr>
+              <td>{{ category.name }}</td>
+              <td>
+                <span class="status-badge" [class.inactive]="!category.active">{{ statusLabel(category) }}</span>
+              </td>
+              <td>{{ formatDate(category.createdAt) }}</td>
+              <td>
+                <div class="row-actions">
+                  <button
+                    pButton
+                    type="button"
+                    class="icon-action"
+                    aria-label="Editar categoria"
+                    title="Editar"
+                    [disabled]="rowActionId() === category.id"
+                    (click)="openEditDialog(category)"
+                  >
+                    <i class="pi pi-pencil" aria-hidden="true"></i>
+                  </button>
+                  <button
+                    pButton
+                    type="button"
+                    class="icon-action"
+                    [attr.aria-label]="category.active ? 'Desativar categoria' : 'Ativar categoria'"
+                    [title]="category.active ? 'Desativar' : 'Ativar'"
+                    [disabled]="rowActionId() === category.id"
+                    (click)="confirmStatus(category)"
+                  >
+                    <i [class]="category.active ? 'pi pi-ban' : 'pi pi-check-circle'" aria-hidden="true"></i>
+                  </button>
+                  <button
+                    pButton
+                    type="button"
+                    class="icon-action danger"
+                    aria-label="Excluir categoria"
+                    title="Excluir"
+                    [disabled]="rowActionId() === category.id"
+                    (click)="confirmDelete(category)"
+                  >
+                    <i class="pi pi-trash" aria-hidden="true"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+
+      <div class="mobile-list">
+        @for (category of categories(); track category.id) {
+          <article class="category-card">
+            <div>
+              <h2>{{ category.name }}</h2>
+            </div>
+            <span class="status-badge" [class.inactive]="!category.active">{{ statusLabel(category) }}</span>
+            <dl>
+              <dt>Cadastro</dt>
+              <dd>{{ formatDate(category.createdAt) }}</dd>
+            </dl>
+            <div class="card-actions">
+              <button
+                pButton
+                type="button"
+                class="icon-action"
+                aria-label="Editar categoria"
+                title="Editar"
+                (click)="openEditDialog(category)"
+              >
+                <i class="pi pi-pencil" aria-hidden="true"></i>
+              </button>
+              <button
+                pButton
+                type="button"
+                class="icon-action"
+                [attr.aria-label]="category.active ? 'Desativar categoria' : 'Ativar categoria'"
+                [title]="category.active ? 'Desativar' : 'Ativar'"
+                (click)="confirmStatus(category)"
+              >
+                <i [class]="category.active ? 'pi pi-ban' : 'pi pi-check-circle'" aria-hidden="true"></i>
+              </button>
+              <button
+                pButton
+                type="button"
+                class="icon-action danger"
+                aria-label="Excluir categoria"
+                title="Excluir"
+                (click)="confirmDelete(category)"
+              >
+                <i class="pi pi-trash" aria-hidden="true"></i>
+              </button>
+            </div>
+          </article>
+        }
+      </div>
+    }
+  </div>
+</section>
+
+<p-dialog
+  header="Nova categoria"
+  [(visible)]="createDialogOpen"
+  [modal]="true"
+  [draggable]="false"
+  [resizable]="false"
+  styleClass="category-dialog"
+  (onHide)="closeCreateDialog()"
+>
+  <form class="dialog-form" (ngSubmit)="createCategory()">
+    <label>
+      <span>Nome</span>
+      <input
+        pInputText
+        type="text"
+        name="create-category-name"
+        autocomplete="off"
+        required
+        [(ngModel)]="createForm.name"
+      />
+    </label>
+
+    <footer class="dialog-actions">
+      <button pButton type="button" class="secondary-action" (click)="closeCreateDialog()" [disabled]="submitting()">
+        Cancelar
+      </button>
+      <button pButton type="submit" [disabled]="!formValid(createForm) || submitting()">
+        {{ submitting() ? 'Salvando...' : 'Salvar' }}
+      </button>
+    </footer>
+  </form>
+</p-dialog>
+
+<p-dialog
+  header="Editar categoria"
+  [(visible)]="editDialogOpen"
+  [modal]="true"
+  [draggable]="false"
+  [resizable]="false"
+  styleClass="category-dialog"
+  (onHide)="closeEditDialog()"
+>
+  <form class="dialog-form" (ngSubmit)="updateCategory()">
+    <label>
+      <span>Nome</span>
+      <input
+        pInputText
+        type="text"
+        name="edit-category-name"
+        autocomplete="off"
+        required
+        [(ngModel)]="editForm.name"
+      />
+    </label>
+
+    <footer class="dialog-actions">
+      <button pButton type="button" class="secondary-action" (click)="closeEditDialog()" [disabled]="submitting()">
+        Cancelar
+      </button>
+      <button pButton type="submit" [disabled]="!formValid(editForm) || submitting()">
+        {{ submitting() ? 'Salvando...' : 'Salvar' }}
+      </button>
+    </footer>
+  </form>
+</p-dialog>
+
+<p-dialog
+  [header]="confirmationTitle()"
+  [visible]="confirmation() !== null"
+  [modal]="true"
+  [draggable]="false"
+  [resizable]="false"
+  styleClass="category-dialog"
+  (onHide)="cancelConfirmation()"
+>
+  <div class="confirmation-body">
+    <p>{{ confirmationText() }}</p>
+  </div>
+
+  <footer class="dialog-actions">
+    <button pButton type="button" class="secondary-action" (click)="cancelConfirmation()" [disabled]="submitting()">
+      Cancelar
+    </button>
+    <button pButton type="button" [class.danger-action]="confirmation()?.kind === 'delete'" (click)="applyConfirmation()" [disabled]="submitting()">
+      {{ submitting() ? 'Processando...' : 'Confirmar' }}
+    </button>
+  </footer>
+</p-dialog>

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/alexandre/senshi-training-planner/backend/internal/auth"
+	"github.com/alexandre/senshi-training-planner/backend/internal/categories"
 	"github.com/alexandre/senshi-training-planner/backend/internal/config"
 	"github.com/alexandre/senshi-training-planner/backend/internal/database"
 	"github.com/alexandre/senshi-training-planner/backend/internal/professors"
@@ -34,6 +35,9 @@ func main() {
 	professorStore := professors.NewPostgresStore(pool)
 	professorService := professors.NewService(professorStore)
 	professorHandler := professors.NewHandler(professorService)
+	categoryStore := categories.NewPostgresStore(pool)
+	categoryService := categories.NewService(categoryStore)
+	categoryHandler := categories.NewHandler(categoryService)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", healthHandler)
@@ -43,6 +47,8 @@ func main() {
 	}
 	mux.Handle("/professors", adminOnly(http.HandlerFunc(professorHandler.Collection)))
 	mux.Handle("/professors/", adminOnly(http.HandlerFunc(professorHandler.Resource)))
+	mux.Handle("/categories", adminOnly(http.HandlerFunc(categoryHandler.Collection)))
+	mux.Handle("/categories/", adminOnly(http.HandlerFunc(categoryHandler.Resource)))
 
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,

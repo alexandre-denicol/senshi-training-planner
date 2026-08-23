@@ -16,7 +16,7 @@ const navItems: NavItem[] = [
   { label: 'Agenda', icon: 'pi pi-calendar' },
   { label: 'Treinos', icon: 'pi pi-list-check' },
   { label: 'Blocos', icon: 'pi pi-th-large' },
-  { label: 'Categorias', icon: 'pi pi-tags' },
+  { label: 'Categorias', icon: 'pi pi-tags', path: '/app/categorias', adminOnly: true },
   { label: 'Histórico', icon: 'pi pi-clock' },
   { label: 'Professores', icon: 'pi pi-users', path: '/app/professores', adminOnly: true },
 ];
