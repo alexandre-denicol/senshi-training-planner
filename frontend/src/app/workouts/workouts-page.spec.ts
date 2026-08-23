@@ -158,6 +158,20 @@ describe('WorkoutsPage', () => {
     expect(fixture.nativeElement.textContent).toContain('Nenhum treino cadastrado.');
   });
 
+  it('shows safe message when workout delete is blocked by agenda', async () => {
+    const original = workout({ id: 'workout-1', name: 'Treino Base' });
+    const api = new FakeWorkoutApi([original]);
+    api.deleteError = new HttpErrorResponse({ status: 409, statusText: 'Conflict' });
+    const { fixture, component } = await renderPage([original], [block()], api);
+
+    component.confirmDelete(original);
+    await component.applyConfirmation();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Este treino está sendo utilizado na agenda e não pode ser excluído.');
+    expect(fixture.nativeElement.textContent).not.toContain('schedule_entries_workout_id_fkey');
+  });
+
   it('clears form state after dialog closes', async () => {
     const original = workout({ id: 'workout-1', name: 'Treino' });
     const { component } = await renderPage([original], [block()]);
@@ -252,6 +266,7 @@ class FakeWorkoutApi {
   loadedDetails: string[] = [];
   details = new Map<string, WorkoutDetail>();
   createError: unknown = null;
+  deleteError: unknown = null;
 
   constructor(public workouts: WorkoutListItem[]) {}
 
@@ -299,6 +314,9 @@ class FakeWorkoutApi {
 
   async delete(id: string): Promise<void> {
     this.deleted.push(id);
+    if (this.deleteError) {
+      throw this.deleteError;
+    }
     this.workouts = this.workouts.filter((item) => item.id !== id);
   }
 }

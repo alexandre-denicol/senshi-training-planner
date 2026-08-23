@@ -1,0 +1,206 @@
+<section class="schedule-page" aria-labelledby="schedule-title">
+  <header class="page-header">
+    <div>
+      <h1 id="schedule-title">Agenda</h1>
+      <p>Planeje os treinos por data.</p>
+    </div>
+
+    @if (isAdmin()) {
+      <button
+        pButton
+        type="button"
+        class="primary-action"
+        [disabled]="!hasActiveWorkouts()"
+        (click)="openCreateDialog()"
+      >
+        <i class="pi pi-plus" aria-hidden="true"></i>
+        <span>Agendar treino</span>
+      </button>
+    }
+  </header>
+
+  <div class="period-bar" aria-label="Navegação do período">
+    <button pButton type="button" class="icon-action" aria-label="Mês anterior" title="Mês anterior" (click)="previousMonth()">
+      <i class="pi pi-chevron-left" aria-hidden="true"></i>
+    </button>
+    <h2>{{ periodLabel() }}</h2>
+    <button pButton type="button" class="icon-action" aria-label="Próximo mês" title="Próximo mês" (click)="nextMonth()">
+      <i class="pi pi-chevron-right" aria-hidden="true"></i>
+    </button>
+    <button pButton type="button" class="secondary-action today-action" (click)="goToToday()">Hoje</button>
+  </div>
+
+  @if (successMessage()) {
+    <p class="feedback success" role="status">{{ successMessage() }}</p>
+  }
+
+  @if (errorMessage()) {
+    <p class="feedback error" role="alert">{{ errorMessage() }}</p>
+  }
+
+  @if (isAdmin() && !loading() && !hasActiveWorkouts()) {
+    <p class="feedback notice" role="status">Cadastre ou ative pelo menos um treino antes de agendar.</p>
+  }
+
+  <div class="surface">
+    @if (loading()) {
+      <div class="loading-state" role="status" aria-label="Carregando agenda">
+        <span class="loading-indicator" aria-hidden="true"></span>
+      </div>
+    } @else if (!hasEntries()) {
+      <div class="empty-list">
+        <p>Nenhum treino agendado neste período.</p>
+        @if (isAdmin()) {
+          <button pButton type="button" [disabled]="!hasActiveWorkouts()" (click)="openCreateDialog()">
+            <i class="pi pi-plus" aria-hidden="true"></i>
+            <span>Agendar treino</span>
+          </button>
+        }
+      </div>
+    } @else {
+      <div class="date-groups">
+        @for (group of groups(); track group.date) {
+          <section class="date-group" [attr.aria-labelledby]="'date-' + group.date">
+            <header>
+              <h2 [id]="'date-' + group.date">{{ group.label }}</h2>
+              <span>{{ formatDate(group.date) }}</span>
+            </header>
+
+            <div class="entry-list">
+              @for (entry of group.entries; track entry.id) {
+                <article class="entry-card">
+                  <div>
+                    <h3>{{ entry.workout.name }}</h3>
+                    @if (!entry.workout.active) {
+                      <span class="inline-badge">Inativo</span>
+                    }
+                  </div>
+
+                  @if (isAdmin()) {
+                    <div class="row-actions">
+                      <button
+                        pButton
+                        type="button"
+                        class="icon-action"
+                        aria-label="Editar agendamento"
+                        title="Editar"
+                        [disabled]="rowActionId() === entry.id"
+                        (click)="openEditDialog(entry)"
+                      >
+                        <i class="pi pi-pencil" aria-hidden="true"></i>
+                      </button>
+                      <button
+                        pButton
+                        type="button"
+                        class="icon-action danger"
+                        aria-label="Remover agendamento"
+                        title="Remover"
+                        [disabled]="rowActionId() === entry.id"
+                        (click)="confirmDelete(entry)"
+                      >
+                        <i class="pi pi-trash" aria-hidden="true"></i>
+                      </button>
+                    </div>
+                  }
+                </article>
+              }
+            </div>
+          </section>
+        }
+      </div>
+    }
+  </div>
+</section>
+
+<p-dialog
+  header="Agendar treino"
+  [(visible)]="createDialogOpen"
+  [modal]="true"
+  [draggable]="false"
+  [resizable]="false"
+  styleClass="schedule-dialog"
+  (onHide)="closeCreateDialog()"
+>
+  <form class="dialog-form" (ngSubmit)="createEntry()">
+    <ng-container *ngTemplateOutlet="scheduleEditor; context: { form: createForm, currentWorkout: null }"></ng-container>
+
+    <footer class="dialog-actions">
+      <button pButton type="button" class="secondary-action" (click)="closeCreateDialog()" [disabled]="submitting()">
+        Cancelar
+      </button>
+      <button pButton type="submit" [disabled]="!formValid(createForm) || submitting()">
+        {{ submitting() ? 'Salvando...' : 'Salvar' }}
+      </button>
+    </footer>
+  </form>
+</p-dialog>
+
+<p-dialog
+  header="Editar agendamento"
+  [(visible)]="editDialogOpen"
+  [modal]="true"
+  [draggable]="false"
+  [resizable]="false"
+  styleClass="schedule-dialog"
+  (onHide)="closeEditDialog()"
+>
+  <form class="dialog-form" (ngSubmit)="updateEntry()">
+    <ng-container *ngTemplateOutlet="scheduleEditor; context: { form: editForm, currentWorkout: selectedEntry?.workout ?? null }"></ng-container>
+
+    <footer class="dialog-actions">
+      <button pButton type="button" class="secondary-action" (click)="closeEditDialog()" [disabled]="submitting()">
+        Cancelar
+      </button>
+      <button pButton type="submit" [disabled]="!formValid(editForm) || submitting()">
+        {{ submitting() ? 'Salvando...' : 'Salvar' }}
+      </button>
+    </footer>
+  </form>
+</p-dialog>
+
+<ng-template #scheduleEditor let-form="form" let-currentWorkout="currentWorkout">
+  <label>
+    <span>Data</span>
+    <input
+      pInputText
+      type="date"
+      name="scheduled-date"
+      autocomplete="off"
+      required
+      [(ngModel)]="form.scheduledDate"
+    />
+  </label>
+
+  <label>
+    <span>Treino</span>
+    <select name="schedule-workout" required [(ngModel)]="form.workoutId">
+      <option value="">Selecione um treino ativo</option>
+      @for (workout of availableWorkouts(currentWorkout); track workout.id) {
+        <option [value]="workout.id">{{ workoutOptionLabel(workout) }}</option>
+      }
+    </select>
+  </label>
+</ng-template>
+
+<p-dialog
+  [header]="confirmationTitle()"
+  [visible]="confirmation() !== null"
+  [modal]="true"
+  [draggable]="false"
+  [resizable]="false"
+  styleClass="schedule-dialog"
+  (onHide)="cancelConfirmation()"
+>
+  <div class="confirmation-body">
+    <p>Isso remove apenas o agendamento. O treino permanece no catálogo.</p>
+  </div>
+
+  <footer class="dialog-actions">
+    <button pButton type="button" class="secondary-action" (click)="cancelConfirmation()" [disabled]="submitting()">
+      Cancelar
+    </button>
+    <button pButton type="button" class="danger-action" (click)="applyConfirmation()" [disabled]="submitting()">
+      {{ submitting() ? 'Processando...' : 'Confirmar' }}
+    </button>
+  </footer>
+</p-dialog>

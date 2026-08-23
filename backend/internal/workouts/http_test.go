@@ -89,6 +89,16 @@ func TestWorkoutHTTPListDetailCreateDuplicateUpdateStatusDeleteAndNotFound(t *te
 		t.Fatal("expected delete route to pass id")
 	}
 
+	service.deleteErr = ErrInUse
+	inUse := performWorkoutRequest(t, auth.RoleAdmin, service, http.MethodDelete, "/workouts/"+workoutID, "")
+	if inUse.Code != http.StatusConflict {
+		t.Fatalf("expected scheduled workout delete 409, got %d", inUse.Code)
+	}
+	if strings.Contains(inUse.Body.String(), "schedule_entries_workout_id_fkey") {
+		t.Fatalf("expected safe error body, got %s", inUse.Body.String())
+	}
+	service.deleteErr = nil
+
 	service.detailErr = ErrNotFound
 	notFound := performWorkoutRequest(t, auth.RoleAdmin, service, http.MethodGet, "/workouts/"+workoutID, "")
 	if notFound.Code != http.StatusNotFound {
@@ -169,6 +179,7 @@ type fakeWorkoutService struct {
 	detailErr      error
 	createErr      error
 	updateErr      error
+	deleteErr      error
 }
 
 func (s *fakeWorkoutService) List(context.Context) ([]WorkoutListItem, error) {
@@ -206,7 +217,7 @@ func (s *fakeWorkoutService) SetStatus(_ context.Context, _ string, input Status
 
 func (s *fakeWorkoutService) Delete(_ context.Context, id string) error {
 	s.deleteID = id
-	return nil
+	return s.deleteErr
 }
 
 type fakeAuthStore struct {

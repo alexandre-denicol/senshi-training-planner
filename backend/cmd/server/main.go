@@ -13,6 +13,7 @@ import (
 	"github.com/alexandre/senshi-training-planner/backend/internal/config"
 	"github.com/alexandre/senshi-training-planner/backend/internal/database"
 	"github.com/alexandre/senshi-training-planner/backend/internal/professors"
+	"github.com/alexandre/senshi-training-planner/backend/internal/schedule"
 	"github.com/alexandre/senshi-training-planner/backend/internal/workouts"
 )
 
@@ -46,6 +47,9 @@ func main() {
 	workoutStore := workouts.NewPostgresStore(pool)
 	workoutService := workouts.NewService(workoutStore)
 	workoutHandler := workouts.NewHandler(workoutService)
+	scheduleStore := schedule.NewPostgresStore(pool)
+	scheduleService := schedule.NewService(scheduleStore)
+	scheduleHandler := schedule.NewHandler(scheduleService)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", healthHandler)
@@ -61,6 +65,14 @@ func main() {
 	mux.Handle("/blocks/", adminOnly(http.HandlerFunc(blockHandler.Resource)))
 	mux.Handle("/workouts", adminOnly(http.HandlerFunc(workoutHandler.Collection)))
 	mux.Handle("/workouts/", adminOnly(http.HandlerFunc(workoutHandler.Resource)))
+	mux.Handle("/schedule", authHandler.Authenticate(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			scheduleHandler.Collection(w, r)
+			return
+		}
+		auth.RequireAdmin(http.HandlerFunc(scheduleHandler.Collection)).ServeHTTP(w, r)
+	})))
+	mux.Handle("/schedule/", adminOnly(http.HandlerFunc(scheduleHandler.Resource)))
 
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,

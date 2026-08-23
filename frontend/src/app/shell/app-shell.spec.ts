@@ -23,6 +23,7 @@ describe('AppShell', () => {
   it('shows Professores navigation for ADMIN', async () => {
     const fixture = await renderShell(adminUser);
 
+    expect(fixture.nativeElement.textContent).toContain('Agenda');
     expect(fixture.nativeElement.textContent).toContain('Professores');
     expect(fixture.nativeElement.textContent).toContain('Categorias');
     expect(fixture.nativeElement.textContent).toContain('Blocos');
@@ -32,6 +33,7 @@ describe('AppShell', () => {
   it('does not show management navigation for PROFESSOR', async () => {
     const fixture = await renderShell(professorUser);
 
+    expect(fixture.nativeElement.textContent).toContain('Agenda');
     expect(fixture.nativeElement.textContent).not.toContain('Professores');
     expect(fixture.nativeElement.textContent).not.toContain('Categorias');
     expect(fixture.nativeElement.textContent).not.toContain('Blocos');

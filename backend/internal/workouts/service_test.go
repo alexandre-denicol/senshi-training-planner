@@ -126,6 +126,12 @@ func TestServiceUpdateReorderStatusDeleteAndNotFound(t *testing.T) {
 		t.Fatalf("expected deleted id %s, got %s", workoutID, store.deletedID)
 	}
 
+	store.deleteErr = ErrInUse
+	if err := service.Delete(context.Background(), workoutID); !errors.Is(err, ErrInUse) {
+		t.Fatalf("expected scheduled workout deletion to be blocked, got %v", err)
+	}
+	store.deleteErr = nil
+
 	_, err = service.Get(context.Background(), missingID)
 	if !errors.Is(err, ErrNotFound) {
 		t.Fatalf("expected missing get not found, got %v", err)
@@ -150,6 +156,7 @@ type fakeWorkoutStore struct {
 	deletedID       string
 	createErr       error
 	updateErr       error
+	deleteErr       error
 }
 
 func (s *fakeWorkoutStore) ListWorkouts(context.Context) ([]WorkoutListItem, error) {
@@ -194,6 +201,9 @@ func (s *fakeWorkoutStore) SetWorkoutStatus(_ context.Context, id string, active
 func (s *fakeWorkoutStore) DeleteWorkout(_ context.Context, id string) error {
 	if id == missingID {
 		return ErrNotFound
+	}
+	if s.deleteErr != nil {
+		return s.deleteErr
 	}
 	s.deletedID = id
 	return nil
