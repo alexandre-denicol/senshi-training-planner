@@ -12,6 +12,7 @@ var (
 	ErrInvalidRequest = errors.New("invalid request")
 	ErrNameExists     = errors.New("category name already exists")
 	ErrNotFound       = errors.New("category not found")
+	ErrInUse          = errors.New("category is in use")
 )
 
 type Category struct {

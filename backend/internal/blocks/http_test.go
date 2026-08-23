@@ -1,4 +1,4 @@
-package categories
+package blocks
 
 import (
 	"context"
@@ -13,49 +13,52 @@ import (
 	"github.com/alexandre/senshi-training-planner/backend/internal/httpapi"
 )
 
-func TestCategoryHTTPAuthorization(t *testing.T) {
-	if response := performUnauthenticatedCategoryRequest(t, &fakeCategoryService{}, http.MethodGet, "/categories", ""); response.Code != http.StatusUnauthorized {
+func TestBlockHTTPAuthorization(t *testing.T) {
+	if response := performUnauthenticatedBlockRequest(t, &fakeBlockService{}, http.MethodGet, "/blocks", ""); response.Code != http.StatusUnauthorized {
 		t.Fatalf("expected unauthenticated status 401, got %d", response.Code)
 	}
-	if response := performCategoryRequest(t, auth.RoleProfessor, &fakeCategoryService{}, http.MethodGet, "/categories", ""); response.Code != http.StatusForbidden {
+	if response := performBlockRequest(t, auth.RoleProfessor, &fakeBlockService{}, http.MethodGet, "/blocks", ""); response.Code != http.StatusForbidden {
 		t.Fatalf("expected professor status 403, got %d", response.Code)
 	}
-	if response := performCategoryRequest(t, auth.RoleAdmin, &fakeCategoryService{}, http.MethodGet, "/categories", ""); response.Code != http.StatusOK {
+	if response := performBlockRequest(t, auth.RoleAdmin, &fakeBlockService{}, http.MethodGet, "/blocks", ""); response.Code != http.StatusOK {
 		t.Fatalf("expected admin status 200, got %d", response.Code)
 	}
 }
 
-func TestCategoryHTTPCreateDuplicateUpdateStatusDeleteAndNotFound(t *testing.T) {
-	service := &fakeCategoryService{
-		createdCategory: Category{ID: categoryID, Name: "Técnica", Active: true},
-		updatedCategory: Category{ID: categoryID, Name: "Mobilidade", Active: true},
-		statusCategory:  Category{ID: categoryID, Name: "Mobilidade", Active: false},
+func TestBlockHTTPCreateDuplicateUpdateStatusDeleteAndNotFound(t *testing.T) {
+	service := &fakeBlockService{
+		createdBlock: blockFixture(blockID, "Base", activeCategoryID, true),
+		updatedBlock: blockFixture(blockID, "Avançado", otherCategoryID, true),
+		statusBlock:  blockFixture(blockID, "Avançado", otherCategoryID, false),
 	}
 
-	create := performCategoryRequest(t, auth.RoleAdmin, service, http.MethodPost, "/categories", `{"name":"Técnica"}`)
+	create := performBlockRequest(t, auth.RoleAdmin, service, http.MethodPost, "/blocks", `{"name":"Base","categoryId":"`+activeCategoryID+`"}`)
 	if create.Code != http.StatusCreated {
 		t.Fatalf("expected create 201, got %d", create.Code)
 	}
-	if service.createInput.Name != "Técnica" {
+	if service.createInput.Name != "Base" || service.createInput.CategoryID != activeCategoryID {
 		t.Fatal("expected create input to reach service")
+	}
+	if strings.Contains(create.Body.String(), "password_hash") {
+		t.Fatal("block response leaked unexpected sensitive field")
 	}
 
 	service.createErr = ErrNameExists
-	duplicate := performCategoryRequest(t, auth.RoleAdmin, service, http.MethodPost, "/categories", `{"name":"técnica"}`)
+	duplicate := performBlockRequest(t, auth.RoleAdmin, service, http.MethodPost, "/blocks", `{"name":"base","categoryId":"`+activeCategoryID+`"}`)
 	if duplicate.Code != http.StatusConflict {
 		t.Fatalf("expected duplicate 409, got %d", duplicate.Code)
 	}
 	service.createErr = nil
 
-	update := performCategoryRequest(t, auth.RoleAdmin, service, http.MethodPut, "/categories/"+categoryID, `{"name":"Mobilidade"}`)
+	update := performBlockRequest(t, auth.RoleAdmin, service, http.MethodPut, "/blocks/"+blockID, `{"name":"Avançado","categoryId":"`+otherCategoryID+`"}`)
 	if update.Code != http.StatusOK {
 		t.Fatalf("expected update 200, got %d", update.Code)
 	}
-	if service.updateID != categoryID {
+	if service.updateID != blockID {
 		t.Fatal("expected update route to pass id")
 	}
 
-	status := performCategoryRequest(t, auth.RoleAdmin, service, http.MethodPatch, "/categories/"+categoryID+"/status", `{"active":false}`)
+	status := performBlockRequest(t, auth.RoleAdmin, service, http.MethodPatch, "/blocks/"+blockID+"/status", `{"active":false}`)
 	if status.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", status.Code)
 	}
@@ -63,44 +66,35 @@ func TestCategoryHTTPCreateDuplicateUpdateStatusDeleteAndNotFound(t *testing.T) 
 		t.Fatal("expected status input to deactivate")
 	}
 
-	remove := performCategoryRequest(t, auth.RoleAdmin, service, http.MethodDelete, "/categories/"+categoryID, "")
+	remove := performBlockRequest(t, auth.RoleAdmin, service, http.MethodDelete, "/blocks/"+blockID, "")
 	if remove.Code != http.StatusNoContent {
 		t.Fatalf("expected delete 204, got %d", remove.Code)
 	}
-	if service.deleteID != categoryID {
+	if service.deleteID != blockID {
 		t.Fatal("expected delete route to pass id")
 	}
 
 	service.updateErr = ErrNotFound
-	notFound := performCategoryRequest(t, auth.RoleAdmin, service, http.MethodPut, "/categories/"+categoryID, `{"name":"Outra"}`)
+	notFound := performBlockRequest(t, auth.RoleAdmin, service, http.MethodPut, "/blocks/"+blockID, `{"name":"Outra","categoryId":"`+activeCategoryID+`"}`)
 	if notFound.Code != http.StatusNotFound {
 		t.Fatalf("expected not found 404, got %d", notFound.Code)
 	}
-
-	service.deleteErr = ErrInUse
-	inUse := performCategoryRequest(t, auth.RoleAdmin, service, http.MethodDelete, "/categories/"+categoryID, "")
-	if inUse.Code != http.StatusConflict {
-		t.Fatalf("expected in-use delete 409, got %d", inUse.Code)
-	}
-	if strings.Contains(inUse.Body.String(), "blocks_category_id_fkey") {
-		t.Fatal("expected FK details to stay hidden")
-	}
 }
 
-func TestCategoryHTTPJSONValidation(t *testing.T) {
+func TestBlockHTTPJSONValidation(t *testing.T) {
 	tests := []struct {
 		name string
 		body string
 	}{
 		{name: "malformed", body: `{"name":`},
-		{name: "unknown field", body: `{"name":"Técnica","description":"x"}`},
-		{name: "trailing json", body: `{"name":"Técnica"} {"name":"Outra"}`},
-		{name: "oversized", body: `{"name":"` + strings.Repeat("a", httpapi.MaxJSONBodyBytes) + `"}`},
+		{name: "unknown field", body: `{"name":"Base","categoryId":"` + activeCategoryID + `","description":"x"}`},
+		{name: "trailing json", body: `{"name":"Base","categoryId":"` + activeCategoryID + `"} {"name":"Outra"}`},
+		{name: "oversized", body: `{"name":"` + strings.Repeat("a", httpapi.MaxJSONBodyBytes) + `","categoryId":"` + activeCategoryID + `"}`},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			response := performCategoryRequest(t, auth.RoleAdmin, &fakeCategoryService{}, http.MethodPost, "/categories", tt.body)
+			response := performBlockRequest(t, auth.RoleAdmin, &fakeBlockService{}, http.MethodPost, "/blocks", tt.body)
 			if response.Code != http.StatusBadRequest {
 				t.Fatalf("expected status 400, got %d", response.Code)
 			}
@@ -108,14 +102,14 @@ func TestCategoryHTTPJSONValidation(t *testing.T) {
 	}
 }
 
-func performCategoryRequest(t *testing.T, role auth.Role, service ServiceAPI, method string, path string, body string) *httptest.ResponseRecorder {
+func performBlockRequest(t *testing.T, role auth.Role, service ServiceAPI, method string, path string, body string) *httptest.ResponseRecorder {
 	t.Helper()
 
 	user := auth.PublicUser{ID: "user-id", Name: "User", Email: "user@example.com", Role: role}
 	return performRequest(t, &user, service, method, path, body)
 }
 
-func performUnauthenticatedCategoryRequest(t *testing.T, service ServiceAPI, method string, path string, body string) *httptest.ResponseRecorder {
+func performUnauthenticatedBlockRequest(t *testing.T, service ServiceAPI, method string, path string, body string) *httptest.ResponseRecorder {
 	t.Helper()
 	return performRequest(t, nil, service, method, path, body)
 }
@@ -126,14 +120,14 @@ func performRequest(t *testing.T, user *auth.PublicUser, service ServiceAPI, met
 	authStore := &fakeAuthStore{user: user}
 	authService := auth.NewService(authStore)
 	authHandler := auth.NewHandler(authService, auth.NewLoginLimiter(), config.AppEnvDevelopment)
-	categoryHandler := NewHandler(service)
+	blockHandler := NewHandler(service)
 
 	mux := http.NewServeMux()
 	adminOnly := func(next http.Handler) http.Handler {
 		return authHandler.Authenticate(auth.RequireAdmin(next))
 	}
-	mux.Handle("/categories", adminOnly(http.HandlerFunc(categoryHandler.Collection)))
-	mux.Handle("/categories/", adminOnly(http.HandlerFunc(categoryHandler.Resource)))
+	mux.Handle("/blocks", adminOnly(http.HandlerFunc(blockHandler.Collection)))
+	mux.Handle("/blocks/", adminOnly(http.HandlerFunc(blockHandler.Resource)))
 
 	request := httptest.NewRequest(method, path, strings.NewReader(body))
 	if user != nil {
@@ -146,60 +140,56 @@ func performRequest(t *testing.T, user *auth.PublicUser, service ServiceAPI, met
 	return response
 }
 
-type fakeCategoryService struct {
-	categories      []Category
-	createdCategory Category
-	updatedCategory Category
-	statusCategory  Category
-	createInput     CreateInput
-	updateID        string
-	statusInput     StatusInput
-	deleteID        string
-	createErr       error
-	updateErr       error
-	deleteErr       error
+type fakeBlockService struct {
+	blocks       []Block
+	createdBlock Block
+	updatedBlock Block
+	statusBlock  Block
+	createInput  CreateInput
+	updateID     string
+	statusInput  StatusInput
+	deleteID     string
+	createErr    error
+	updateErr    error
 }
 
-func (s *fakeCategoryService) List(context.Context) ([]Category, error) {
-	return s.categories, nil
+func (s *fakeBlockService) List(context.Context) ([]Block, error) {
+	return s.blocks, nil
 }
 
-func (s *fakeCategoryService) Create(_ context.Context, input CreateInput) (Category, error) {
+func (s *fakeBlockService) Create(_ context.Context, input CreateInput) (Block, error) {
 	s.createInput = input
 	if s.createErr != nil {
-		return Category{}, s.createErr
+		return Block{}, s.createErr
 	}
-	return s.createdCategory, nil
+	return s.createdBlock, nil
 }
 
-func (s *fakeCategoryService) Update(_ context.Context, id string, input UpdateInput) (Category, error) {
+func (s *fakeBlockService) Update(_ context.Context, id string, input UpdateInput) (Block, error) {
 	s.updateID = id
 	if s.updateErr != nil {
-		return Category{}, s.updateErr
+		return Block{}, s.updateErr
 	}
-	if s.updatedCategory.ID == "" {
-		return Category{ID: id, Name: input.Name, Active: true}, nil
+	if s.updatedBlock.ID == "" {
+		return blockFixture(id, input.Name, input.CategoryID, true), nil
 	}
-	return s.updatedCategory, nil
+	return s.updatedBlock, nil
 }
 
-func (s *fakeCategoryService) SetStatus(_ context.Context, id string, input StatusInput) (Category, error) {
+func (s *fakeBlockService) SetStatus(_ context.Context, id string, input StatusInput) (Block, error) {
 	s.statusInput = input
-	if s.statusCategory.ID == "" {
+	if s.statusBlock.ID == "" {
 		active := false
 		if input.Active != nil {
 			active = *input.Active
 		}
-		return Category{ID: id, Name: "Categoria", Active: active}, nil
+		return blockFixture(id, "Base", activeCategoryID, active), nil
 	}
-	return s.statusCategory, nil
+	return s.statusBlock, nil
 }
 
-func (s *fakeCategoryService) Delete(_ context.Context, id string) error {
+func (s *fakeBlockService) Delete(_ context.Context, id string) error {
 	s.deleteID = id
-	if s.deleteErr != nil {
-		return s.deleteErr
-	}
 	return nil
 }
 

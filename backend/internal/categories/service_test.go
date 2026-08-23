@@ -110,6 +110,10 @@ func TestServiceUpdateStatusDeleteAndNotFound(t *testing.T) {
 	if err := service.Delete(context.Background(), missingID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("expected missing delete not found, got %v", err)
 	}
+	store.deleteErr = ErrInUse
+	if err := service.Delete(context.Background(), categoryID); !errors.Is(err, ErrInUse) {
+		t.Fatalf("expected in-use delete error, got %v", err)
+	}
 	_, err = service.SetStatus(context.Background(), categoryID, StatusInput{})
 	if !errors.Is(err, ErrInvalidRequest) {
 		t.Fatalf("expected missing active invalid request, got %v", err)
@@ -119,6 +123,7 @@ func TestServiceUpdateStatusDeleteAndNotFound(t *testing.T) {
 type fakeCategoryStore struct {
 	created   NewCategory
 	createErr error
+	deleteErr error
 	deletedID string
 }
 
@@ -157,6 +162,9 @@ func (s *fakeCategoryStore) SetCategoryStatus(_ context.Context, id string, acti
 func (s *fakeCategoryStore) DeleteCategory(_ context.Context, id string) error {
 	if id == missingID {
 		return ErrNotFound
+	}
+	if s.deleteErr != nil {
+		return s.deleteErr
 	}
 	s.deletedID = id
 	return nil
