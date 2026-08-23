@@ -75,6 +75,14 @@ describe('auth guards', () => {
     expect(result).toBe(true);
   });
 
+  it('allows ADMIN access to Treinos route', async () => {
+    configureGuardTest(adminUser);
+
+    const result = await TestBed.runInInjectionContext(() => adminGuard({} as never, {} as never));
+
+    expect(result).toBe(true);
+  });
+
   it('blocks PROFESSOR access to Professores route', async () => {
     configureGuardTest(professorUser);
 
@@ -92,6 +100,14 @@ describe('auth guards', () => {
   });
 
   it('blocks PROFESSOR access to Blocos route', async () => {
+    configureGuardTest(professorUser);
+
+    const result = await TestBed.runInInjectionContext(() => adminGuard({} as never, {} as never));
+
+    expect((result as UrlTree).toString()).toBe('/app');
+  });
+
+  it('blocks PROFESSOR access to Treinos route', async () => {
     configureGuardTest(professorUser);
 
     const result = await TestBed.runInInjectionContext(() => adminGuard({} as never, {} as never));

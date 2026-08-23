@@ -193,6 +193,10 @@ export class BlocksPage implements OnInit {
       }
       this.confirmation.set(null);
     } catch (error) {
+      if (confirmation.kind === 'delete' && this.isConflict(error)) {
+        this.errorMessage.set('Este bloco está sendo utilizado por um ou mais treinos e não pode ser excluído.');
+        return;
+      }
       await this.handleRequestError(error);
     } finally {
       this.rowActionId.set(null);
@@ -275,6 +279,10 @@ export class BlocksPage implements OnInit {
     }
 
     this.errorMessage.set('Não foi possível concluir a operação. Tente novamente.');
+  }
+
+  private isConflict(error: unknown): boolean {
+    return error instanceof HttpErrorResponse && error.status === 409;
   }
 
   private clearMessages(): void {

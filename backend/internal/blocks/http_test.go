@@ -79,6 +79,15 @@ func TestBlockHTTPCreateDuplicateUpdateStatusDeleteAndNotFound(t *testing.T) {
 	if notFound.Code != http.StatusNotFound {
 		t.Fatalf("expected not found 404, got %d", notFound.Code)
 	}
+
+	service.deleteErr = ErrInUse
+	inUse := performBlockRequest(t, auth.RoleAdmin, service, http.MethodDelete, "/blocks/"+blockID, "")
+	if inUse.Code != http.StatusConflict {
+		t.Fatalf("expected in-use delete 409, got %d", inUse.Code)
+	}
+	if strings.Contains(inUse.Body.String(), "workout_blocks_block_id_fkey") {
+		t.Fatal("expected FK details to stay hidden")
+	}
 }
 
 func TestBlockHTTPJSONValidation(t *testing.T) {
@@ -151,6 +160,7 @@ type fakeBlockService struct {
 	deleteID     string
 	createErr    error
 	updateErr    error
+	deleteErr    error
 }
 
 func (s *fakeBlockService) List(context.Context) ([]Block, error) {
@@ -190,6 +200,9 @@ func (s *fakeBlockService) SetStatus(_ context.Context, id string, input StatusI
 
 func (s *fakeBlockService) Delete(_ context.Context, id string) error {
 	s.deleteID = id
+	if s.deleteErr != nil {
+		return s.deleteErr
+	}
 	return nil
 }
 

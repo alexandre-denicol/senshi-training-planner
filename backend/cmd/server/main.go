@@ -13,6 +13,7 @@ import (
 	"github.com/alexandre/senshi-training-planner/backend/internal/config"
 	"github.com/alexandre/senshi-training-planner/backend/internal/database"
 	"github.com/alexandre/senshi-training-planner/backend/internal/professors"
+	"github.com/alexandre/senshi-training-planner/backend/internal/workouts"
 )
 
 func main() {
@@ -42,6 +43,9 @@ func main() {
 	blockStore := blocks.NewPostgresStore(pool)
 	blockService := blocks.NewService(blockStore)
 	blockHandler := blocks.NewHandler(blockService)
+	workoutStore := workouts.NewPostgresStore(pool)
+	workoutService := workouts.NewService(workoutStore)
+	workoutHandler := workouts.NewHandler(workoutService)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", healthHandler)
@@ -55,6 +59,8 @@ func main() {
 	mux.Handle("/categories/", adminOnly(http.HandlerFunc(categoryHandler.Resource)))
 	mux.Handle("/blocks", adminOnly(http.HandlerFunc(blockHandler.Collection)))
 	mux.Handle("/blocks/", adminOnly(http.HandlerFunc(blockHandler.Resource)))
+	mux.Handle("/workouts", adminOnly(http.HandlerFunc(workoutHandler.Collection)))
+	mux.Handle("/workouts/", adminOnly(http.HandlerFunc(workoutHandler.Resource)))
 
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,

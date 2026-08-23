@@ -6,6 +6,7 @@ import { LoginPage } from './login/login.page';
 import { ProfessorsPage } from './professors/professors-page';
 import { AppShell } from './shell/app-shell';
 import { WelcomePage } from './welcome/welcome-page';
+import { WorkoutsPage } from './workouts/workouts-page';
 
 export const routes: Routes = [
   { path: 'login', component: LoginPage, canActivate: [loginGuard] },
@@ -15,6 +16,7 @@ export const routes: Routes = [
     canActivate: [authGuard],
     children: [
       { path: '', pathMatch: 'full', component: WelcomePage },
+      { path: 'treinos', component: WorkoutsPage, canActivate: [adminGuard] },
       { path: 'blocos', component: BlocksPage, canActivate: [adminGuard] },
       { path: 'categorias', component: CategoriesPage, canActivate: [adminGuard] },
       { path: 'professores', component: ProfessorsPage, canActivate: [adminGuard] },
