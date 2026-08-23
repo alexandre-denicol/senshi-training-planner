@@ -29,6 +29,7 @@ interface CompletionForm {
   participantCount: string | number | null;
   participantName: string;
   participantNames: string[];
+  notes: string;
 }
 
 @Component({
@@ -259,11 +260,15 @@ export class SchedulePage implements OnInit {
   protected completionFormValid(): boolean {
     const count = this.completionCountText();
     if (count === '') {
-      return true;
+      return this.completionNotesValid();
     }
 
     const value = Number(count);
-    return Number.isInteger(value) && value >= 0 && value <= 500;
+    return Number.isInteger(value) && value >= 0 && value <= 500 && this.completionNotesValid();
+  }
+
+  protected completionNotesCounter(): string {
+    return `${Array.from(this.completionForm.notes).length} / 2000`;
   }
 
   protected async completeEntry(): Promise<void> {
@@ -409,7 +414,7 @@ export class SchedulePage implements OnInit {
   }
 
   private emptyCompletionForm(): CompletionForm {
-    return { participantCount: '', participantName: '', participantNames: [] };
+    return { participantCount: '', participantName: '', participantNames: [], notes: '' };
   }
 
   private completionPayload(): CompletionDetails {
@@ -420,6 +425,10 @@ export class SchedulePage implements OnInit {
     }
     if (this.completionForm.participantNames.length > 0) {
       payload.participantNames = this.completionForm.participantNames;
+    }
+    const notes = this.completionForm.notes.trim();
+    if (notes !== '') {
+      payload.notes = notes;
     }
 
     return payload;
@@ -432,6 +441,10 @@ export class SchedulePage implements OnInit {
     }
 
     return String(count).trim();
+  }
+
+  private completionNotesValid(): boolean {
+    return Array.from(this.completionForm.notes).length <= 2000;
   }
 }
 

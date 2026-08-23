@@ -51,10 +51,10 @@ describe('ScheduleApiService', () => {
     request.flush(null, { status: 204, statusText: 'No Content' });
     await remove;
 
-    const complete = service.complete('schedule-id', { participantCount: 12, participantNames: ['João'] });
+    const complete = service.complete('schedule-id', { participantCount: 12, participantNames: ['João'], notes: 'Boa resposta.' });
     request = http.expectOne('/api/schedule/schedule-id/complete');
     expect(request.request.method).toBe('POST');
-    expect(request.request.body).toEqual({ participantCount: 12, participantNames: ['João'] });
+    expect(request.request.body).toEqual({ participantCount: 12, participantNames: ['João'], notes: 'Boa resposta.' });
     expect(request.request.withCredentials).toBe(true);
     request.flush({});
     await complete;

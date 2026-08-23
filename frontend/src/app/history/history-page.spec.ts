@@ -28,6 +28,7 @@ describe('HistoryPage', () => {
     expect(text).toContain('4 blocos');
     expect(text).toContain('1 aluno');
     expect(text).toContain('2 alunos');
+    expect(text).not.toContain('Boa resposta da turma');
     expect(text.indexOf('Treino Snapshot')).toBeLessThan(text.indexOf('Nome Antigo'));
   });
 
@@ -73,6 +74,7 @@ describe('HistoryPage', () => {
       ],
       participantCount: 12,
       participantNames: ['João', 'Maria', 'Pedro'],
+      notes: 'Boa resposta da turma.\nLinha 2 preservada.',
     }));
     const { fixture, component } = await renderPage(api.items, api);
 
@@ -87,6 +89,9 @@ describe('HistoryPage', () => {
     expect(text).toContain('Participação');
     expect(text).toContain('Quantidade: 12 alunos');
     expect(text).toContain('João');
+    expect(text).toContain('Observações');
+    expect(text).toContain('Boa resposta da turma.');
+    expect(text).toContain('Linha 2 preservada.');
     expect(text.indexOf('João')).toBeLessThan(text.indexOf('Maria'));
     expect(text.indexOf('Bloco Snapshot A')).toBeLessThan(text.indexOf('Bloco Snapshot B'));
   });
@@ -115,6 +120,18 @@ describe('HistoryPage', () => {
     await component.openDetail(api.items[2]);
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Participação não informada.');
+  });
+
+  it('renders missing notes state in detail', async () => {
+    const api = new FakeHistoryApi([historyItem({ id: 'history-1' })]);
+    api.details.set('history-1', historyDetail({ id: 'history-1', notes: null }));
+    const { fixture, component } = await renderPage(api.items, api);
+
+    await component.openDetail(api.items[0]);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Observações');
+    expect(fixture.nativeElement.textContent).toContain('Nenhuma observação registrada.');
   });
 
   it('handles invalid range and missing detail errors safely', async () => {
@@ -176,6 +193,7 @@ function historyDetail(overrides: Partial<HistoryDetail> = {}): HistoryDetail {
     workoutName: 'Treino Snapshot',
     participantCount: null,
     participantNames: [],
+    notes: null,
     completedByName: 'Professor Snapshot',
     completedAt: '2026-08-24T15:32:00Z',
     blocks: [

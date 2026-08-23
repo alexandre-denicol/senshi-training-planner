@@ -38,6 +38,7 @@ describe('HistoryApiService', () => {
       workoutName: 'Treino',
       participantCount: 12,
       participantNames: ['João'],
+      notes: 'Boa resposta.',
       completedByName: 'Professor',
       completedAt: '2026-08-24T15:32:00Z',
       blocks: [],

@@ -12,6 +12,7 @@ const MaxRangeDays = 93
 const MaxParticipantCount = 500
 const MaxParticipantNames = 100
 const MaxParticipantNameChars = 120
+const MaxNotesChars = 2000
 
 var (
 	ErrInvalidRequest      = errors.New("invalid request")
@@ -38,6 +39,7 @@ type Detail struct {
 	WorkoutName      string    `json:"workoutName"`
 	ParticipantCount *int      `json:"participantCount"`
 	ParticipantNames []string  `json:"participantNames"`
+	Notes            *string   `json:"notes"`
 	CompletedByName  string    `json:"completedByName"`
 	CompletedAt      time.Time `json:"completedAt"`
 	Blocks           []Block   `json:"blocks"`
@@ -64,4 +66,5 @@ type ServiceAPI interface {
 type CompletionDetails struct {
 	ParticipantCount *int
 	ParticipantNames []string
+	Notes            *string
 }

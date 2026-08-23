@@ -17,6 +17,7 @@ type Handler struct {
 type completeRequest struct {
 	ParticipantCount *int     `json:"participantCount"`
 	ParticipantNames []string `json:"participantNames"`
+	Notes            *string  `json:"notes"`
 }
 
 func NewHandler(service ServiceAPI) *Handler {
@@ -121,6 +122,7 @@ func readCompleteRequest(w http.ResponseWriter, r *http.Request) (CompletionDeta
 	return CompletionDetails{
 		ParticipantCount: request.ParticipantCount,
 		ParticipantNames: request.ParticipantNames,
+		Notes:            request.Notes,
 	}, nil
 }
 

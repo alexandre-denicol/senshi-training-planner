@@ -25,6 +25,7 @@ export interface ScheduleRequest {
 export interface CompletionDetails {
   participantCount?: number | null;
   participantNames?: string[];
+  notes?: string | null;
 }
 
 @Injectable({ providedIn: 'root' })

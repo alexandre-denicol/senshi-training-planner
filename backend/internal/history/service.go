@@ -135,6 +135,10 @@ func validateCompletionDetails(details CompletionDetails) (CompletionDetails, er
 	if len(details.ParticipantNames) > MaxParticipantNames {
 		return CompletionDetails{}, ErrInvalidRequest
 	}
+	notes := normalizeNotes(details.Notes)
+	if notes != nil && len([]rune(*notes)) > MaxNotesChars {
+		return CompletionDetails{}, ErrInvalidRequest
+	}
 
 	names := make([]string, 0, len(details.ParticipantNames))
 	for _, name := range details.ParticipantNames {
@@ -151,5 +155,19 @@ func validateCompletionDetails(details CompletionDetails) (CompletionDetails, er
 	return CompletionDetails{
 		ParticipantCount: details.ParticipantCount,
 		ParticipantNames: names,
+		Notes:            notes,
 	}, nil
+}
+
+func normalizeNotes(notes *string) *string {
+	if notes == nil {
+		return nil
+	}
+
+	trimmed := strings.TrimSpace(*notes)
+	if trimmed == "" {
+		return nil
+	}
+
+	return &trimmed
 }
