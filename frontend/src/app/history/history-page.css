@@ -137,6 +137,7 @@ dt,
 .history-card h3,
 .history-detail h2,
 .participation-section h3,
+.notes-section h3,
 .snapshot-blocks h3 {
   color: #fff;
   font-size: 1rem;
@@ -229,7 +230,8 @@ dd {
   padding: 0;
 }
 
-.participation-section {
+.participation-section,
+.notes-section {
   background: #111418;
   border: 1px solid #2a3039;
   display: grid;
@@ -237,9 +239,16 @@ dd {
   padding: 0.8rem;
 }
 
-.participation-section p {
+.participation-section p,
+.notes-section p {
   color: #dbe5f3;
   margin: 0;
+}
+
+.notes-section p {
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 .participation-section ol {

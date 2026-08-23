@@ -287,6 +287,7 @@ describe('SchedulePage', () => {
       participantCount: '10',
       participantName: '',
       participantNames: ['Alexandre Denicol', 'Alan Fogaça', 'Maria'],
+      notes: '',
     };
     fixture.detectChanges();
 
@@ -312,6 +313,7 @@ describe('SchedulePage', () => {
       participantCount: 2,
       participantName: '',
       participantNames: ['Alexandre Denicol', 'Alan Fogaça'],
+      notes: '  Boa resposta da turma.\nLinha 2  ',
     };
     const previousLoadCount = api.ranges.length;
     fixture.detectChanges();
@@ -326,26 +328,87 @@ describe('SchedulePage', () => {
         details: {
           participantCount: 2,
           participantNames: ['Alexandre Denicol', 'Alan Fogaça'],
+          notes: 'Boa resposta da turma.\nLinha 2',
         },
       },
     ]);
     expect(api.ranges.length).toBeGreaterThan(previousLoadCount);
     expect(component.completeDialogOpen()).toBe(false);
-    expect(component.completionForm).toEqual({ participantCount: '', participantName: '', participantNames: [] });
+    expect(component.completionForm).toEqual({ participantCount: '', participantName: '', participantNames: [], notes: '' });
     expect(fixture.nativeElement.textContent).toContain('Treino registrado como realizado.');
   });
 
-  it('empty details completion omits missing count instead of converting it to zero', async () => {
+  it('empty details completion omits missing count and notes instead of sending canonical empty values', async () => {
+    const original = entry({ id: 'entry-1' });
+    const api = new FakeScheduleApi([original]);
+    const { fixture, component } = await renderPage(adminUser, [original], [workout()], api);
+
+    component.confirmComplete(original);
+    component.completionForm.notes = '   \n  ';
+    fixture.detectChanges();
+    clickButton(fixture.nativeElement, 'Registrar como realizado');
+    await fixture.whenStable();
+
+    expect(api.completed[0]).toEqual({ id: 'entry-1', details: {} });
+  });
+
+  it('shows optional completion notes textarea and character counter', async () => {
     const original = entry({ id: 'entry-1' });
     const api = new FakeScheduleApi([original]);
     const { fixture, component } = await renderPage(adminUser, [original], [workout()], api);
 
     component.confirmComplete(original);
     fixture.detectChanges();
-    clickButton(fixture.nativeElement, 'Registrar como realizado');
-    await fixture.whenStable();
 
-    expect(api.completed[0]).toEqual({ id: 'entry-1', details: {} });
+    const textarea = fixture.nativeElement.querySelector('textarea[name="completion-notes"]') as HTMLTextAreaElement;
+    expect(fixture.nativeElement.textContent).toContain('Observações (opcional)');
+    expect(textarea).toBeTruthy();
+    expect(textarea.getAttribute('maxlength')).toBe('2000');
+    expect(textarea.getAttribute('placeholder')).toBe('Ex.: adaptações realizadas, dificuldades ou observações gerais do treino.');
+    expect(fixture.nativeElement.textContent).toContain('0 / 2000');
+
+    setInputValue(textarea, 'Linha 1\nLinha 2');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('15 / 2000');
+  });
+
+  it('rejects completion notes above the frontend limit without submitting', async () => {
+    const original = entry({ id: 'entry-1' });
+    const api = new FakeScheduleApi([original]);
+    const { fixture, component } = await renderPage(adminUser, [original], [workout()], api);
+
+    component.confirmComplete(original);
+    component.completionForm.notes = 'a'.repeat(2001);
+    fixture.detectChanges();
+
+    const submit = Array.from(fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>)
+      .find((button) => button.textContent?.includes('Registrar como realizado'));
+    if (!submit) {
+      throw new Error('completion submit button not found');
+    }
+    expect(component.completionFormValid()).toBe(false);
+    expect(submit.disabled).toBe(true);
+
+    await component.completeEntry();
+    expect(api.completed).toHaveLength(0);
+  });
+
+  it('clears notes after successful completion and does not reopen with previous text', async () => {
+    const original = entry({ id: 'entry-1' });
+    const api = new FakeScheduleApi([original]);
+    const { fixture, component } = await renderPage(adminUser, [original], [workout()], api);
+
+    component.confirmComplete(original);
+    component.completionForm.notes = 'Observação temporária';
+    await component.completeEntry();
+    fixture.detectChanges();
+
+    expect(component.completionForm.notes).toBe('');
+
+    component.confirmComplete(original);
+    fixture.detectChanges();
+    const textarea = fixture.nativeElement.querySelector('textarea[name="completion-notes"]') as HTMLTextAreaElement;
+    expect(textarea.value).toBe('');
   });
 
   it('prevents duplicate completion while request is pending', async () => {
@@ -430,9 +493,9 @@ describe('SchedulePage', () => {
     expect(component.editForm).toEqual({ scheduledDate: '', workoutId: '' });
 
     component.confirmComplete(original);
-    component.completionForm = { participantCount: '12', participantName: 'Maria', participantNames: ['João'] };
+    component.completionForm = { participantCount: '12', participantName: 'Maria', participantNames: ['João'], notes: 'Observação temporária' };
     component.closeCompleteDialog();
-    expect(component.completionForm).toEqual({ participantCount: '', participantName: '', participantNames: [] });
+    expect(component.completionForm).toEqual({ participantCount: '', participantName: '', participantNames: [], notes: '' });
   });
 });
 
@@ -577,7 +640,7 @@ function pendingPromise(): DeferredPromise {
   return { promise, resolve };
 }
 
-function setInputValue(input: HTMLInputElement | null, value: string): void {
+function setInputValue(input: HTMLInputElement | HTMLTextAreaElement | null, value: string): void {
   if (!input) {
     throw new Error('input not found');
   }

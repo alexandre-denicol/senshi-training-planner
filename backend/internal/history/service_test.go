@@ -27,6 +27,7 @@ func TestServiceCompleteSnapshotsScheduleAndUserData(t *testing.T) {
 	detail, err := service.Complete(context.Background(), scheduleEntryID, user, CompletionDetails{
 		ParticipantCount: intPtr(12),
 		ParticipantNames: []string{" João ", "Maria"},
+		Notes:            stringPtr("  Turma respondeu bem.\nReduzimos a intensidade.  "),
 	})
 	if err != nil {
 		t.Fatalf("expected completion success, got %v", err)
@@ -50,6 +51,9 @@ func TestServiceCompleteSnapshotsScheduleAndUserData(t *testing.T) {
 	if len(store.details.ParticipantNames) != 2 || store.details.ParticipantNames[0] != "João" || store.details.ParticipantNames[1] != "Maria" {
 		t.Fatalf("expected trimmed participant names to reach store, got %#v", store.details.ParticipantNames)
 	}
+	if store.details.Notes == nil || *store.details.Notes != "Turma respondeu bem.\nReduzimos a intensidade." {
+		t.Fatalf("expected trimmed notes with line breaks to reach store, got %#v", store.details.Notes)
+	}
 	if detail.WorkoutName != "Treino Snapshot" || detail.Blocks[0].BlockName != "Bloco A" || detail.Blocks[0].CategoryName != "Categoria A" {
 		t.Fatalf("expected snapshot values in detail, got %#v", detail)
 	}
@@ -62,6 +66,7 @@ func TestServiceCompleteParticipantDetailsValidation(t *testing.T) {
 		wantErr   bool
 		wantCount *int
 		wantNames []string
+		wantNotes *string
 	}{
 		{name: "no details", details: CompletionDetails{}, wantNames: []string{}},
 		{name: "empty object equivalent", details: CompletionDetails{ParticipantNames: nil}, wantNames: []string{}},
@@ -71,12 +76,17 @@ func TestServiceCompleteParticipantDetailsValidation(t *testing.T) {
 		{name: "zero preserved", details: CompletionDetails{ParticipantCount: intPtr(0)}, wantCount: intPtr(0), wantNames: []string{}},
 		{name: "count can be smaller than names", details: CompletionDetails{ParticipantCount: intPtr(1), ParticipantNames: []string{"João", "Maria"}}, wantCount: intPtr(1), wantNames: []string{"João", "Maria"}},
 		{name: "duplicate names accepted", details: CompletionDetails{ParticipantNames: []string{"João", "João"}}, wantNames: []string{"João", "João"}},
+		{name: "notes trimmed", details: CompletionDetails{Notes: stringPtr("  Boa resposta da turma.  ")}, wantNames: []string{}, wantNotes: stringPtr("Boa resposta da turma.")},
+		{name: "notes line breaks preserved", details: CompletionDetails{Notes: stringPtr("Linha 1\nLinha 2")}, wantNames: []string{}, wantNotes: stringPtr("Linha 1\nLinha 2")},
+		{name: "whitespace notes become null", details: CompletionDetails{Notes: stringPtr("   \n\t  ")}, wantNames: []string{}},
+		{name: "exactly max notes accepted", details: CompletionDetails{Notes: stringPtr(strings.Repeat("ã", MaxNotesChars))}, wantNames: []string{}, wantNotes: stringPtr(strings.Repeat("ã", MaxNotesChars))},
 		{name: "negative count", details: CompletionDetails{ParticipantCount: intPtr(-1)}, wantErr: true},
 		{name: "too large count", details: CompletionDetails{ParticipantCount: intPtr(501)}, wantErr: true},
 		{name: "blank name", details: CompletionDetails{ParticipantNames: []string{""}}, wantErr: true},
 		{name: "whitespace name", details: CompletionDetails{ParticipantNames: []string{"   "}}, wantErr: true},
 		{name: "oversized name", details: CompletionDetails{ParticipantNames: []string{strings.Repeat("ã", MaxParticipantNameChars+1)}}, wantErr: true},
 		{name: "too many names", details: CompletionDetails{ParticipantNames: repeatNames(MaxParticipantNames + 1)}, wantErr: true},
+		{name: "oversized notes", details: CompletionDetails{Notes: stringPtr(strings.Repeat("ã", MaxNotesChars+1))}, wantErr: true},
 	}
 
 	for _, tt := range tests {
@@ -107,6 +117,12 @@ func TestServiceCompleteParticipantDetailsValidation(t *testing.T) {
 				if store.details.ParticipantNames[index] != want {
 					t.Fatalf("expected names %#v, got %#v", tt.wantNames, store.details.ParticipantNames)
 				}
+			}
+			if (tt.wantNotes == nil) != (store.details.Notes == nil) {
+				t.Fatalf("expected notes %#v, got %#v", tt.wantNotes, store.details.Notes)
+			}
+			if tt.wantNotes != nil && *tt.wantNotes != *store.details.Notes {
+				t.Fatalf("expected notes %q, got %q", *tt.wantNotes, *store.details.Notes)
 			}
 		})
 	}
@@ -229,7 +245,17 @@ func detailWithParticipantsFixture() Detail {
 	return detail
 }
 
+func detailWithNotesFixture() Detail {
+	detail := detailWithParticipantsFixture()
+	detail.Notes = stringPtr("Turma respondeu bem.\nReduzimos a intensidade.")
+	return detail
+}
+
 func intPtr(value int) *int {
+	return &value
+}
+
+func stringPtr(value string) *string {
 	return &value
 }
 

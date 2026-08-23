@@ -49,11 +49,11 @@ func TestHistoryHTTPListDetailAndCompletionErrors(t *testing.T) {
 	if !strings.Contains(list.Body.String(), `"blockCount":2`) {
 		t.Fatalf("expected compact history list, got %s", list.Body.String())
 	}
-	if !strings.Contains(list.Body.String(), `"participantCount":1`) || strings.Contains(list.Body.String(), "participantNames") {
-		t.Fatalf("expected compact participant count without names in list, got %s", list.Body.String())
+	if !strings.Contains(list.Body.String(), `"participantCount":1`) || strings.Contains(list.Body.String(), "participantNames") || strings.Contains(list.Body.String(), "notes") {
+		t.Fatalf("expected compact participant count without names or notes in list, got %s", list.Body.String())
 	}
 
-	service.detail = detailWithParticipantsFixture()
+	service.detail = detailWithNotesFixture()
 	detail := performHistoryRequest(t, auth.RoleProfessor, service, http.MethodGet, "/history/"+historyID)
 	if detail.Code != http.StatusOK {
 		t.Fatalf("expected detail 200, got %d", detail.Code)
@@ -63,6 +63,9 @@ func TestHistoryHTTPListDetailAndCompletionErrors(t *testing.T) {
 	}
 	if !strings.Contains(detail.Body.String(), `"participantCount":12`) || !strings.Contains(detail.Body.String(), `"participantNames":["João","Maria"]`) {
 		t.Fatalf("expected participant details, got %s", detail.Body.String())
+	}
+	if !strings.Contains(detail.Body.String(), `"notes":"Turma respondeu bem.\nReduzimos a intensidade."`) {
+		t.Fatalf("expected notes in detail, got %s", detail.Body.String())
 	}
 
 	service.listErr = ErrInvalidRequest
@@ -99,13 +102,17 @@ func TestHistoryHTTPCompletionRequestBody(t *testing.T) {
 		wantCode  int
 		wantCount *int
 		wantNames []string
+		wantNotes *string
 	}{
 		{name: "no body remains valid", body: "", wantCode: http.StatusCreated, wantNames: []string{}},
 		{name: "empty object valid", body: `{}`, wantCode: http.StatusCreated, wantNames: []string{}},
 		{name: "count only", body: `{"participantCount":12}`, wantCode: http.StatusCreated, wantCount: intPtr(12), wantNames: []string{}},
 		{name: "names only", body: `{"participantNames":["João","Maria"]}`, wantCode: http.StatusCreated, wantNames: []string{"João", "Maria"}},
-		{name: "count and names", body: `{"participantCount":1,"participantNames":["João","Maria"]}`, wantCode: http.StatusCreated, wantCount: intPtr(1), wantNames: []string{"João", "Maria"}},
+		{name: "count names and notes", body: `{"participantCount":1,"participantNames":["João","Maria"],"notes":"  Boa resposta.\nLinha 2  "}`, wantCode: http.StatusCreated, wantCount: intPtr(1), wantNames: []string{"João", "Maria"}, wantNotes: stringPtr("Boa resposta.\nLinha 2")},
 		{name: "zero preserved", body: `{"participantCount":0}`, wantCode: http.StatusCreated, wantCount: intPtr(0), wantNames: []string{}},
+		{name: "whitespace notes normalize to null", body: `{"notes":"   \n\t  "}`, wantCode: http.StatusCreated, wantNames: []string{}},
+		{name: "exactly max notes accepted", body: `{"notes":"` + strings.Repeat("a", MaxNotesChars) + `"}`, wantCode: http.StatusCreated, wantNames: []string{}, wantNotes: stringPtr(strings.Repeat("a", MaxNotesChars))},
+		{name: "oversized notes rejected", body: `{"notes":"` + strings.Repeat("a", MaxNotesChars+1) + `"}`, wantCode: http.StatusBadRequest},
 		{name: "decimal count rejected", body: `{"participantCount":2.5}`, wantCode: http.StatusBadRequest},
 		{name: "negative count rejected", body: `{"participantCount":-1}`, wantCode: http.StatusBadRequest},
 		{name: "blank name rejected", body: `{"participantNames":["   "]}`, wantCode: http.StatusBadRequest},
@@ -139,6 +146,12 @@ func TestHistoryHTTPCompletionRequestBody(t *testing.T) {
 				if service.details.ParticipantNames[index] != want {
 					t.Fatalf("expected names %#v, got %#v", tt.wantNames, service.details.ParticipantNames)
 				}
+			}
+			if (tt.wantNotes == nil) != (service.details.Notes == nil) {
+				t.Fatalf("expected notes %#v, got %#v", tt.wantNotes, service.details.Notes)
+			}
+			if tt.wantNotes != nil && *tt.wantNotes != *service.details.Notes {
+				t.Fatalf("expected notes %q, got %q", *tt.wantNotes, *service.details.Notes)
 			}
 		})
 	}

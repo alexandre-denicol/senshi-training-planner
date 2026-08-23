@@ -25,6 +25,7 @@ export interface HistoryDetail {
   workoutName: string;
   participantCount: number | null;
   participantNames: string[];
+  notes: string | null;
   completedByName: string;
   completedAt: string;
   blocks: HistoryBlock[];

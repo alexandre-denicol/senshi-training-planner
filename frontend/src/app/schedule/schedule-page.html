@@ -273,6 +273,20 @@
         <p class="dialog-error" role="alert">{{ completionFormError() }}</p>
       }
 
+      <label>
+        <span>Observações (opcional)</span>
+        <textarea
+          #notesInput
+          name="completion-notes"
+          maxlength="2000"
+          rows="5"
+          placeholder="Ex.: adaptações realizadas, dificuldades ou observações gerais do treino."
+          [value]="completionForm.notes"
+          (input)="completionForm.notes = notesInput.value"
+        ></textarea>
+      </label>
+      <span class="notes-counter">{{ completionNotesCounter() }}</span>
+
       <p class="irreversible-note">Após registrar o treino como realizado, essas informações não poderão ser alteradas.</p>
 
       <footer class="dialog-actions">

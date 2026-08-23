@@ -135,6 +135,10 @@ export class HistoryPage implements OnInit {
     return detail.participantCount !== null || detail.participantNames.length > 0;
   }
 
+  protected hasNotes(detail: HistoryDetail): boolean {
+    return detail.notes !== null && detail.notes.trim() !== '';
+  }
+
   private async handleRequestError(error: unknown): Promise<void> {
     if (error instanceof HttpErrorResponse) {
       if (error.status === 401) {

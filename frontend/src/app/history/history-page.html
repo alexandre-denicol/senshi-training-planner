@@ -117,6 +117,15 @@
         }
       </section>
 
+      <section class="notes-section">
+        <h3>Observações</h3>
+        @if (hasNotes(detail)) {
+          <p>{{ detail.notes }}</p>
+        } @else {
+          <p>Nenhuma observação registrada.</p>
+        }
+      </section>
+
       <ol class="snapshot-blocks">
         @for (block of detail.blocks; track block.position) {
           <li>

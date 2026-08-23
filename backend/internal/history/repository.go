@@ -83,9 +83,9 @@ func (s *PostgresStore) CompleteScheduleEntry(ctx context.Context, historyID str
 	const historyQuery = `
 		INSERT INTO training_history (
 			id, schedule_entry_id, training_date, workout_id, workout_name,
-			completed_by_user_id, completed_by_name, completed_at, participant_count
+			completed_by_user_id, completed_by_name, completed_at, participant_count, notes
 		)
-		VALUES ($1, $2, $3::date, $4, $5, $6, $7, $8, $9)`
+		VALUES ($1, $2, $3::date, $4, $5, $6, $7, $8, $9, $10)`
 	if _, err := tx.Exec(ctx, historyQuery,
 		historyID,
 		scheduleEntryID,
@@ -96,6 +96,7 @@ func (s *PostgresStore) CompleteScheduleEntry(ctx context.Context, historyID str
 		completedBy.Name,
 		completedAt,
 		details.ParticipantCount,
+		details.Notes,
 	); historyDuplicateViolation(err) {
 		return Detail{}, ErrAlreadyCompleted
 	} else if err != nil {
@@ -225,17 +226,19 @@ func readWorkoutBlockSnapshots(ctx context.Context, tx pgx.Tx, workoutID string)
 
 func getHistory(ctx context.Context, db queryer, id string) (Detail, error) {
 	const historyQuery = `
-		SELECT id::text, training_date::text, workout_name, participant_count, completed_by_name, completed_at
+		SELECT id::text, training_date::text, workout_name, participant_count, notes, completed_by_name, completed_at
 		FROM training_history
 		WHERE id = $1`
 
 	var detail Detail
 	var participantCount pgtype.Int4
+	var notes pgtype.Text
 	err := db.QueryRow(ctx, historyQuery, id).Scan(
 		&detail.ID,
 		&detail.TrainingDate,
 		&detail.WorkoutName,
 		&participantCount,
+		&notes,
 		&detail.CompletedByName,
 		&detail.CompletedAt,
 	)
@@ -248,6 +251,10 @@ func getHistory(ctx context.Context, db queryer, id string) (Detail, error) {
 	if participantCount.Valid {
 		value := int(participantCount.Int32)
 		detail.ParticipantCount = &value
+	}
+	if notes.Valid {
+		value := notes.String
+		detail.Notes = &value
 	}
 
 	const blocksQuery = `
