@@ -97,12 +97,25 @@ func TestServiceUpdateDeleteNotFoundAndInactiveWorkoutRules(t *testing.T) {
 	}
 	store.updateErr = nil
 
+	store.updateErr = ErrCompleted
+	_, err = service.Update(context.Background(), entryID, UpdateInput{WorkoutID: activeWorkoutID, ScheduledDate: "2026-08-24"})
+	if !errors.Is(err, ErrCompleted) {
+		t.Fatalf("expected completed update conflict, got %v", err)
+	}
+	store.updateErr = nil
+
 	if err := service.Delete(context.Background(), entryID); err != nil {
 		t.Fatalf("expected delete success, got %v", err)
 	}
 	if store.deletedID != entryID {
 		t.Fatalf("expected deleted id %s, got %s", entryID, store.deletedID)
 	}
+
+	store.deleteErr = ErrCompleted
+	if err := service.Delete(context.Background(), entryID); !errors.Is(err, ErrCompleted) {
+		t.Fatalf("expected completed delete conflict, got %v", err)
+	}
+	store.deleteErr = nil
 
 	_, err = service.Update(context.Background(), missingEntryID, UpdateInput{WorkoutID: activeWorkoutID, ScheduledDate: "2026-08-24"})
 	if !errors.Is(err, ErrNotFound) {
@@ -147,6 +160,7 @@ type fakeScheduleStore struct {
 	deletedID       string
 	createErr       error
 	updateErr       error
+	deleteErr       error
 }
 
 func (s *fakeScheduleStore) ListEntries(context.Context, string, string) ([]Entry, error) {
@@ -175,6 +189,9 @@ func (s *fakeScheduleStore) UpdateEntry(_ context.Context, id string, workoutID 
 func (s *fakeScheduleStore) DeleteEntry(_ context.Context, id string) error {
 	if id == missingEntryID {
 		return ErrNotFound
+	}
+	if s.deleteErr != nil {
+		return s.deleteErr
 	}
 	s.deletedID = id
 	return nil

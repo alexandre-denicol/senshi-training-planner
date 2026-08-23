@@ -1,0 +1,165 @@
+package history
+
+import (
+	"context"
+	"errors"
+	"testing"
+	"time"
+
+	"github.com/alexandre/senshi-training-planner/backend/internal/auth"
+)
+
+const (
+	historyID       = "11111111-1111-1111-1111-111111111111"
+	scheduleEntryID = "22222222-2222-2222-2222-222222222222"
+	userID          = "33333333-3333-3333-3333-333333333333"
+)
+
+func TestServiceCompleteSnapshotsScheduleAndUserData(t *testing.T) {
+	store := &fakeHistoryStore{detail: detailFixture()}
+	service := NewService(store)
+	completedAt := time.Date(2026, 8, 23, 15, 32, 0, 0, time.UTC)
+	service.newUUID = func() (string, error) { return historyID, nil }
+	service.now = func() time.Time { return completedAt }
+	user := auth.PublicUser{ID: userID, Name: "Professor X", Email: "professor@example.com", Role: auth.RoleProfessor}
+
+	detail, err := service.Complete(context.Background(), scheduleEntryID, user)
+	if err != nil {
+		t.Fatalf("expected completion success, got %v", err)
+	}
+
+	if detail.TrainingDate != "2026-08-20" {
+		t.Fatalf("expected scheduled date to become training date, got %s", detail.TrainingDate)
+	}
+	if store.completedHistoryID != historyID || store.completedScheduleID != scheduleEntryID {
+		t.Fatal("expected generated history id and schedule id to reach store")
+	}
+	if store.completedBy.ID != userID || store.completedBy.Name != "Professor X" {
+		t.Fatalf("expected authenticated user snapshot input, got %#v", store.completedBy)
+	}
+	if !store.completedAt.Equal(completedAt) {
+		t.Fatalf("expected server completion timestamp, got %s", store.completedAt)
+	}
+	if detail.WorkoutName != "Treino Snapshot" || detail.Blocks[0].BlockName != "Bloco A" || detail.Blocks[0].CategoryName != "Categoria A" {
+		t.Fatalf("expected snapshot values in detail, got %#v", detail)
+	}
+}
+
+func TestServiceCompleteMapsErrors(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want error
+	}{
+		{name: "missing schedule", err: ErrScheduleNotFound, want: ErrScheduleNotFound},
+		{name: "already completed", err: ErrAlreadyCompleted, want: ErrAlreadyCompleted},
+		{name: "empty composition", err: ErrSnapshotUnavailable, want: ErrSnapshotUnavailable},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := &fakeHistoryStore{completeErr: tt.err}
+			service := NewService(store)
+			service.newUUID = func() (string, error) { return historyID, nil }
+			_, err := service.Complete(context.Background(), scheduleEntryID, auth.PublicUser{ID: userID, Name: "User", Role: auth.RoleAdmin})
+			if !errors.Is(err, tt.want) {
+				t.Fatalf("expected %v, got %v", tt.want, err)
+			}
+		})
+	}
+}
+
+func TestServiceHistoryRangeAndDetailValidation(t *testing.T) {
+	service := NewService(&fakeHistoryStore{detail: detailFixture()})
+
+	if _, err := service.List(context.Background(), "2026-08-01", "2026-08-31"); err != nil {
+		t.Fatalf("expected valid range, got %v", err)
+	}
+	if _, err := service.Get(context.Background(), historyID); err != nil {
+		t.Fatalf("expected valid detail, got %v", err)
+	}
+
+	tests := []struct {
+		name string
+		from string
+		to   string
+	}{
+		{name: "invalid date", from: "2026/08/01", to: "2026-08-31"},
+		{name: "impossible date", from: "2026-02-30", to: "2026-08-31"},
+		{name: "from after to", from: "2026-09-01", to: "2026-08-31"},
+		{name: "too large", from: "2026-01-01", to: "2026-04-04"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, err := service.List(context.Background(), tt.from, tt.to); !errors.Is(err, ErrInvalidRequest) {
+				t.Fatalf("expected invalid range, got %v", err)
+			}
+		})
+	}
+
+	if _, err := service.Get(context.Background(), "not-a-uuid"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expected invalid id to be not found, got %v", err)
+	}
+}
+
+type fakeHistoryStore struct {
+	detail              Detail
+	completedHistoryID  string
+	completedScheduleID string
+	completedBy         auth.PublicUser
+	completedAt         time.Time
+	completeErr         error
+	listErr             error
+	getErr              error
+}
+
+func (s *fakeHistoryStore) ListHistory(context.Context, string, string) ([]ListItem, error) {
+	if s.listErr != nil {
+		return nil, s.listErr
+	}
+	return []ListItem{listItemFixture()}, nil
+}
+
+func (s *fakeHistoryStore) GetHistory(context.Context, string) (Detail, error) {
+	if s.getErr != nil {
+		return Detail{}, s.getErr
+	}
+	return s.detail, nil
+}
+
+func (s *fakeHistoryStore) CompleteScheduleEntry(_ context.Context, historyID string, scheduleID string, completedBy auth.PublicUser, completedAt time.Time) (Detail, error) {
+	s.completedHistoryID = historyID
+	s.completedScheduleID = scheduleID
+	s.completedBy = completedBy
+	s.completedAt = completedAt
+	if s.completeErr != nil {
+		return Detail{}, s.completeErr
+	}
+	return s.detail, nil
+}
+
+func detailFixture() Detail {
+	return Detail{
+		ID:              historyID,
+		TrainingDate:    "2026-08-20",
+		WorkoutName:     "Treino Snapshot",
+		CompletedByName: "Professor X",
+		CompletedAt:     time.Date(2026, 8, 23, 15, 32, 0, 0, time.UTC),
+		Blocks: []Block{
+			{Position: 1, BlockName: "Bloco A", CategoryName: "Categoria A"},
+			{Position: 2, BlockName: "Bloco B", CategoryName: "Categoria B"},
+		},
+	}
+}
+
+func listItemFixture() ListItem {
+	return ListItem{
+		ID:              historyID,
+		TrainingDate:    "2026-08-20",
+		WorkoutName:     "Treino Snapshot",
+		BlockCount:      2,
+		CompletedByName: "Professor X",
+		CompletedAt:     time.Date(2026, 8, 23, 15, 32, 0, 0, time.UTC),
+		ScheduleEntryID: scheduleEntryID,
+	}
+}

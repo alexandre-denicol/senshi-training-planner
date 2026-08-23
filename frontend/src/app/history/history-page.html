@@ -1,0 +1,109 @@
+<section class="history-page" aria-labelledby="history-title">
+  <header class="page-header">
+    <div>
+      <h1 id="history-title">Histórico</h1>
+      <p>Consulte os treinos realizados.</p>
+    </div>
+  </header>
+
+  <div class="period-bar" aria-label="Navegação do período">
+    <button pButton type="button" class="icon-action" aria-label="Mês anterior" title="Mês anterior" (click)="previousMonth()">
+      <i class="pi pi-chevron-left" aria-hidden="true"></i>
+    </button>
+    <h2>{{ periodLabel() }}</h2>
+    <button pButton type="button" class="icon-action" aria-label="Próximo mês" title="Próximo mês" (click)="nextMonth()">
+      <i class="pi pi-chevron-right" aria-hidden="true"></i>
+    </button>
+    <button pButton type="button" class="secondary-action today-action" (click)="goToToday()">Hoje</button>
+  </div>
+
+  @if (errorMessage()) {
+    <p class="feedback error" role="alert">{{ errorMessage() }}</p>
+  }
+
+  <div class="surface">
+    @if (loading()) {
+      <div class="loading-state" role="status" aria-label="Carregando histórico">
+        <span class="loading-indicator" aria-hidden="true"></span>
+      </div>
+    } @else if (!hasItems()) {
+      <div class="empty-list">
+        <p>Nenhum treino realizado neste período.</p>
+      </div>
+    } @else {
+      <div class="date-groups">
+        @for (group of groups(); track group.date) {
+          <section class="date-group" [attr.aria-labelledby]="'history-date-' + group.date">
+            <header>
+              <h2 [id]="'history-date-' + group.date">{{ group.label }}</h2>
+              <span>{{ formatDate(group.date) }}</span>
+            </header>
+
+            <div class="entry-list">
+              @for (item of group.items; track item.id) {
+                <button type="button" class="history-card" (click)="openDetail(item)">
+                  <div>
+                    <h3>{{ item.workoutName }}</h3>
+                    <p>Realizado por {{ item.completedByName }}</p>
+                  </div>
+                  <div class="history-meta">
+                    <span>{{ blockCountLabel(item) }}</span>
+                    <span>{{ formatCompletedTime(item.completedAt) }}</span>
+                  </div>
+                </button>
+              }
+            </div>
+          </section>
+        }
+      </div>
+    }
+  </div>
+</section>
+
+<p-dialog
+  header="Detalhes do histórico"
+  [(visible)]="detailDialogOpen"
+  [modal]="true"
+  [draggable]="false"
+  [resizable]="false"
+  styleClass="history-dialog"
+  (onHide)="closeDetail()"
+>
+  @if (detailLoading()) {
+    <div class="loading-state compact" role="status" aria-label="Carregando detalhes">
+      <span class="loading-indicator" aria-hidden="true"></span>
+    </div>
+  } @else if (selectedDetail(); as detail) {
+    <article class="history-detail">
+      <header>
+        <h2>{{ detail.workoutName }}</h2>
+        <dl>
+          <div>
+            <dt>Data do treino</dt>
+            <dd>{{ formatDate(detail.trainingDate) }}</dd>
+          </div>
+          <div>
+            <dt>Registrado por</dt>
+            <dd>{{ detail.completedByName }}</dd>
+          </div>
+          <div>
+            <dt>Registro</dt>
+            <dd>{{ formatCompletedAt(detail.completedAt) }}</dd>
+          </div>
+        </dl>
+      </header>
+
+      <ol class="snapshot-blocks">
+        @for (block of detail.blocks; track block.position) {
+          <li>
+            <span class="position">{{ block.position }}</span>
+            <div>
+              <h3>{{ block.blockName }}</h3>
+              <p>{{ block.categoryName }}</p>
+            </div>
+          </li>
+        }
+      </ol>
+    </article>
+  }
+</p-dialog>

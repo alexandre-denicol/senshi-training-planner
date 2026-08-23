@@ -35,8 +35,11 @@ func TestScheduleHTTPAuthorization(t *testing.T) {
 }
 
 func TestScheduleHTTPCreateUpdateDeleteDuplicateNotFoundAndRange(t *testing.T) {
+	completedEntry := entryFixture(entryID, activeWorkoutID, "2026-08-24", true)
+	completedAt := time.Date(2026, 8, 23, 15, 32, 0, 0, time.UTC)
+	completedEntry.CompletedAt = &completedAt
 	service := &fakeScheduleService{
-		entries:      []Entry{entryFixture(entryID, activeWorkoutID, "2026-08-24", true)},
+		entries:      []Entry{completedEntry},
 		createdEntry: entryFixture(entryID, activeWorkoutID, "2026-08-24", true),
 		updatedEntry: entryFixture(entryID, otherWorkoutID, "2026-08-25", true),
 	}
@@ -47,6 +50,9 @@ func TestScheduleHTTPCreateUpdateDeleteDuplicateNotFoundAndRange(t *testing.T) {
 	}
 	if service.from != "2026-08-01" || service.to != "2026-08-31" {
 		t.Fatalf("expected query range to reach service, got %s %s", service.from, service.to)
+	}
+	if !strings.Contains(list.Body.String(), `"completedAt"`) {
+		t.Fatalf("expected completed entry state to be serialized when present, got %s", list.Body.String())
 	}
 
 	service.listErr = ErrInvalidRequest
@@ -83,6 +89,20 @@ func TestScheduleHTTPCreateUpdateDeleteDuplicateNotFoundAndRange(t *testing.T) {
 	if remove.Code != http.StatusNoContent {
 		t.Fatalf("expected delete 204, got %d", remove.Code)
 	}
+
+	service.updateErr = ErrCompleted
+	completedUpdate := performScheduleRequest(t, auth.RoleAdmin, service, http.MethodPut, "/schedule/"+entryID, `{"workoutId":"`+activeWorkoutID+`","scheduledDate":"2026-08-24"}`)
+	if completedUpdate.Code != http.StatusConflict {
+		t.Fatalf("expected completed update 409, got %d", completedUpdate.Code)
+	}
+	service.updateErr = nil
+
+	service.deleteErr = ErrCompleted
+	completedDelete := performScheduleRequest(t, auth.RoleAdmin, service, http.MethodDelete, "/schedule/"+entryID, "")
+	if completedDelete.Code != http.StatusConflict {
+		t.Fatalf("expected completed delete 409, got %d", completedDelete.Code)
+	}
+	service.deleteErr = nil
 
 	service.updateErr = ErrNotFound
 	notFound := performScheduleRequest(t, auth.RoleAdmin, service, http.MethodPut, "/schedule/"+entryID, `{"workoutId":"`+activeWorkoutID+`","scheduledDate":"2026-08-24"}`)
