@@ -10,6 +10,7 @@ import (
 	"github.com/alexandre/senshi-training-planner/backend/internal/auth"
 	"github.com/alexandre/senshi-training-planner/backend/internal/config"
 	"github.com/alexandre/senshi-training-planner/backend/internal/database"
+	"github.com/alexandre/senshi-training-planner/backend/internal/professors"
 )
 
 func main() {
@@ -30,10 +31,18 @@ func main() {
 	authStore := auth.NewPostgresStore(pool)
 	authService := auth.NewService(authStore)
 	authHandler := auth.NewHandler(authService, auth.NewLoginLimiter(), cfg.AppEnv)
+	professorStore := professors.NewPostgresStore(pool)
+	professorService := professors.NewService(professorStore)
+	professorHandler := professors.NewHandler(professorService)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", healthHandler)
 	authHandler.Register(mux)
+	adminOnly := func(next http.Handler) http.Handler {
+		return authHandler.Authenticate(auth.RequireAdmin(next))
+	}
+	mux.Handle("/professors", adminOnly(http.HandlerFunc(professorHandler.Collection)))
+	mux.Handle("/professors/", adminOnly(http.HandlerFunc(professorHandler.Resource)))
 
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,

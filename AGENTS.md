@@ -36,3 +36,6 @@ Este repositorio e um monorepo com dois projetos principais:
 - Invalidacao de sessao no servidor e obrigatoria.
 - Senhas devem usar Argon2id.
 - Falhas de autenticacao nao devem revelar se uma conta existe.
+- Gerenciamento de contas de professores e exclusivo para ADMIN.
+- Endpoints de gerenciamento de professores nunca devem alterar contas ADMIN.
+- Desativacao e redefinicao de senha de professores devem invalidar sessoes existentes do professor.
