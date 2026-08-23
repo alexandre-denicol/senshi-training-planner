@@ -22,6 +22,15 @@ describe('WorkoutsPage', () => {
     expect(text).not.toContain('workout-id');
   });
 
+  it('keeps operational workout controls visible for authenticated users', async () => {
+    const { fixture } = await renderPage([workout({ name: 'Treino Base' })], [block()]);
+
+    expect(fixture.nativeElement.textContent).toContain('Novo treino');
+    expect(fixture.nativeElement.querySelector('button[aria-label="Editar treino"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('button[aria-label="Desativar treino"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('button[aria-label="Excluir treino"]')).toBeTruthy();
+  });
+
   it('creates workout and preserves selected order', async () => {
     const api = new FakeWorkoutApi([]);
     const { fixture, component } = await renderPage([], [block({ id: 'block-1', name: 'Primeiro' }), block({ id: 'block-2', name: 'Segundo' })], api);

@@ -37,11 +37,28 @@ func TestAdminCanListProfessors(t *testing.T) {
 	}
 }
 
-func TestProfessorReceivesForbidden(t *testing.T) {
-	response := performProfessorRequest(t, auth.RoleProfessor, &fakeProfessorService{}, http.MethodGet, "/professors", "")
+func TestProfessorReceivesForbiddenForAccountAdministration(t *testing.T) {
+	tests := []struct {
+		name   string
+		method string
+		path   string
+		body   string
+	}{
+		{name: "list", method: http.MethodGet, path: "/professors"},
+		{name: "create", method: http.MethodPost, path: "/professors", body: `{"name":"Professor","email":"professor@example.com","password":"uma senha longa e segura"}`},
+		{name: "update", method: http.MethodPut, path: "/professors/" + professorID, body: `{"name":"Professor","email":"professor@example.com"}`},
+		{name: "status", method: http.MethodPatch, path: "/professors/" + professorID + "/status", body: `{"active":false}`},
+		{name: "password", method: http.MethodPut, path: "/professors/" + professorID + "/password", body: `{"password":"uma senha longa e segura"}`},
+		{name: "delete", method: http.MethodDelete, path: "/professors/" + professorID},
+	}
 
-	if response.Code != http.StatusForbidden {
-		t.Fatalf("expected status 403, got %d", response.Code)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			response := performProfessorRequest(t, auth.RoleProfessor, &fakeProfessorService{}, tt.method, tt.path, tt.body)
+			if response.Code != http.StatusForbidden {
+				t.Fatalf("expected status 403, got %d", response.Code)
+			}
+		})
 	}
 }
 

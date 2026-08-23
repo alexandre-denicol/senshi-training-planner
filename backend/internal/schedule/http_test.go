@@ -23,14 +23,18 @@ func TestScheduleHTTPAuthorization(t *testing.T) {
 	if response := performScheduleRequest(t, auth.RoleAdmin, &fakeScheduleService{}, http.MethodGet, "/schedule?from=2026-08-01&to=2026-08-31", ""); response.Code != http.StatusOK {
 		t.Fatalf("expected admin GET 200, got %d", response.Code)
 	}
-	if response := performScheduleRequest(t, auth.RoleProfessor, &fakeScheduleService{}, http.MethodPost, "/schedule", `{}`); response.Code != http.StatusForbidden {
-		t.Fatalf("expected professor POST 403, got %d", response.Code)
+	service := &fakeScheduleService{
+		createdEntry: entryFixture(entryID, activeWorkoutID, "2026-08-24", true),
+		updatedEntry: entryFixture(entryID, otherWorkoutID, "2026-08-25", true),
 	}
-	if response := performScheduleRequest(t, auth.RoleProfessor, &fakeScheduleService{}, http.MethodPut, "/schedule/"+entryID, `{}`); response.Code != http.StatusForbidden {
-		t.Fatalf("expected professor PUT 403, got %d", response.Code)
+	if response := performScheduleRequest(t, auth.RoleProfessor, service, http.MethodPost, "/schedule", `{"workoutId":"`+activeWorkoutID+`","scheduledDate":"2026-08-24"}`); response.Code != http.StatusCreated {
+		t.Fatalf("expected professor POST 201, got %d", response.Code)
 	}
-	if response := performScheduleRequest(t, auth.RoleProfessor, &fakeScheduleService{}, http.MethodDelete, "/schedule/"+entryID, ""); response.Code != http.StatusForbidden {
-		t.Fatalf("expected professor DELETE 403, got %d", response.Code)
+	if response := performScheduleRequest(t, auth.RoleProfessor, service, http.MethodPut, "/schedule/"+entryID, `{"workoutId":"`+otherWorkoutID+`","scheduledDate":"2026-08-25"}`); response.Code != http.StatusOK {
+		t.Fatalf("expected professor PUT 200, got %d", response.Code)
+	}
+	if response := performScheduleRequest(t, auth.RoleProfessor, service, http.MethodDelete, "/schedule/"+entryID, ""); response.Code != http.StatusNoContent {
+		t.Fatalf("expected professor DELETE 204, got %d", response.Code)
 	}
 }
 
@@ -152,17 +156,8 @@ func performRequest(t *testing.T, user *auth.PublicUser, service ServiceAPI, met
 	scheduleHandler := NewHandler(service)
 
 	mux := http.NewServeMux()
-	adminOnly := func(next http.Handler) http.Handler {
-		return authHandler.Authenticate(auth.RequireAdmin(next))
-	}
-	mux.Handle("/schedule", authHandler.Authenticate(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet {
-			scheduleHandler.Collection(w, r)
-			return
-		}
-		auth.RequireAdmin(http.HandlerFunc(scheduleHandler.Collection)).ServeHTTP(w, r)
-	})))
-	mux.Handle("/schedule/", adminOnly(http.HandlerFunc(scheduleHandler.Resource)))
+	mux.Handle("/schedule", authHandler.Authenticate(http.HandlerFunc(scheduleHandler.Collection)))
+	mux.Handle("/schedule/", authHandler.Authenticate(http.HandlerFunc(scheduleHandler.Resource)))
 
 	request := httptest.NewRequest(method, path, strings.NewReader(body))
 	if user != nil {

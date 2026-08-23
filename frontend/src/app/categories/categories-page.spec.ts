@@ -20,6 +20,15 @@ describe('CategoriesPage', () => {
     expect(text).not.toContain('category-id');
   });
 
+  it('keeps operational category controls visible for authenticated users', async () => {
+    const { fixture } = await renderPage([category({ name: 'Técnica' })]);
+
+    expect(fixture.nativeElement.textContent).toContain('Nova categoria');
+    expect(fixture.nativeElement.querySelector('button[aria-label="Editar categoria"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('button[aria-label="Desativar categoria"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('button[aria-label="Excluir categoria"]')).toBeTruthy();
+  });
+
   it('creates category and handles duplicate name', async () => {
     const api = new FakeCategoryApi([]);
     const { fixture, component } = await renderPage([], api);

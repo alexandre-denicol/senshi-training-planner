@@ -23,6 +23,15 @@ describe('BlocksPage', () => {
     expect(text).not.toContain('cat-1');
   });
 
+  it('keeps operational block controls visible for authenticated users', async () => {
+    const { fixture } = await renderPage([block({ name: 'Base' })], [category()]);
+
+    expect(fixture.nativeElement.textContent).toContain('Novo bloco');
+    expect(fixture.nativeElement.querySelector('button[aria-label="Editar bloco"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('button[aria-label="Desativar bloco"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('button[aria-label="Excluir bloco"]')).toBeTruthy();
+  });
+
   it('creates block and handles duplicate name', async () => {
     const blockApi = new FakeBlockApi([]);
     const { fixture, component } = await renderPage([], [category()], blockApi);

@@ -17,11 +17,24 @@ func TestBlockHTTPAuthorization(t *testing.T) {
 	if response := performUnauthenticatedBlockRequest(t, &fakeBlockService{}, http.MethodGet, "/blocks", ""); response.Code != http.StatusUnauthorized {
 		t.Fatalf("expected unauthenticated status 401, got %d", response.Code)
 	}
-	if response := performBlockRequest(t, auth.RoleProfessor, &fakeBlockService{}, http.MethodGet, "/blocks", ""); response.Code != http.StatusForbidden {
-		t.Fatalf("expected professor status 403, got %d", response.Code)
+	if response := performBlockRequest(t, auth.RoleProfessor, &fakeBlockService{}, http.MethodGet, "/blocks", ""); response.Code != http.StatusOK {
+		t.Fatalf("expected professor list status 200, got %d", response.Code)
 	}
 	if response := performBlockRequest(t, auth.RoleAdmin, &fakeBlockService{}, http.MethodGet, "/blocks", ""); response.Code != http.StatusOK {
 		t.Fatalf("expected admin status 200, got %d", response.Code)
+	}
+	service := &fakeBlockService{createdBlock: blockFixture(blockID, "Base", activeCategoryID, true)}
+	if response := performBlockRequest(t, auth.RoleProfessor, service, http.MethodPost, "/blocks", `{"name":"Base","categoryId":"`+activeCategoryID+`"}`); response.Code != http.StatusCreated {
+		t.Fatalf("expected professor create status 201, got %d", response.Code)
+	}
+	if response := performBlockRequest(t, auth.RoleProfessor, service, http.MethodPut, "/blocks/"+blockID, `{"name":"Avançado","categoryId":"`+otherCategoryID+`"}`); response.Code != http.StatusOK {
+		t.Fatalf("expected professor update status 200, got %d", response.Code)
+	}
+	if response := performBlockRequest(t, auth.RoleProfessor, service, http.MethodPatch, "/blocks/"+blockID+"/status", `{"active":false}`); response.Code != http.StatusOK {
+		t.Fatalf("expected professor status update 200, got %d", response.Code)
+	}
+	if response := performBlockRequest(t, auth.RoleProfessor, service, http.MethodDelete, "/blocks/"+blockID, ""); response.Code != http.StatusNoContent {
+		t.Fatalf("expected professor delete status 204, got %d", response.Code)
 	}
 }
 
@@ -132,11 +145,8 @@ func performRequest(t *testing.T, user *auth.PublicUser, service ServiceAPI, met
 	blockHandler := NewHandler(service)
 
 	mux := http.NewServeMux()
-	adminOnly := func(next http.Handler) http.Handler {
-		return authHandler.Authenticate(auth.RequireAdmin(next))
-	}
-	mux.Handle("/blocks", adminOnly(http.HandlerFunc(blockHandler.Collection)))
-	mux.Handle("/blocks/", adminOnly(http.HandlerFunc(blockHandler.Resource)))
+	mux.Handle("/blocks", authHandler.Authenticate(http.HandlerFunc(blockHandler.Collection)))
+	mux.Handle("/blocks/", authHandler.Authenticate(http.HandlerFunc(blockHandler.Resource)))
 
 	request := httptest.NewRequest(method, path, strings.NewReader(body))
 	if user != nil {

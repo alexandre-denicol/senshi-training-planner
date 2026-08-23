@@ -14,9 +14,9 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { label: 'Agenda', icon: 'pi pi-calendar', path: '/app/agenda' },
-  { label: 'Treinos', icon: 'pi pi-list-check', path: '/app/treinos', adminOnly: true },
-  { label: 'Blocos', icon: 'pi pi-th-large', path: '/app/blocos', adminOnly: true },
-  { label: 'Categorias', icon: 'pi pi-tags', path: '/app/categorias', adminOnly: true },
+  { label: 'Treinos', icon: 'pi pi-list-check', path: '/app/treinos' },
+  { label: 'Blocos', icon: 'pi pi-th-large', path: '/app/blocos' },
+  { label: 'Categorias', icon: 'pi pi-tags', path: '/app/categorias' },
   { label: 'Histórico', icon: 'pi pi-clock', path: '/app/historico' },
   { label: 'Professores', icon: 'pi pi-users', path: '/app/professores', adminOnly: true },
 ];
