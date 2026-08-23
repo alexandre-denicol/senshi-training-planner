@@ -1,18 +1,16 @@
 package auth
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
-	"io"
 	"net"
 	"net/http"
 	"strings"
 
 	"github.com/alexandre/senshi-training-planner/backend/internal/config"
+	"github.com/alexandre/senshi-training-planner/backend/internal/httpapi"
 )
 
-const maxAuthBodyBytes = 16 * 1024
+const maxAuthBodyBytes = httpapi.MaxJSONBodyBytes
 
 type Handler struct {
 	service *Service
@@ -127,37 +125,15 @@ func (h *Handler) expiredSessionCookie() *http.Cookie {
 }
 
 func readJSON(w http.ResponseWriter, r *http.Request, destination any) error {
-	r.Body = http.MaxBytesReader(w, r.Body, maxAuthBodyBytes)
-	decoder := json.NewDecoder(r.Body)
-
-	var raw json.RawMessage
-	if err := decoder.Decode(&raw); err != nil {
-		return err
-	}
-
-	var extra any
-	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
-		return errors.New("request body must contain exactly one JSON value")
-	}
-
-	trimmed := bytes.TrimSpace(raw)
-	if len(trimmed) == 0 || trimmed[0] != '{' {
-		return errors.New("request body must contain a JSON object")
-	}
-
-	objectDecoder := json.NewDecoder(bytes.NewReader(raw))
-	objectDecoder.DisallowUnknownFields()
-	return objectDecoder.Decode(destination)
+	return httpapi.ReadJSON(w, r, destination)
 }
 
 func writeJSON(w http.ResponseWriter, statusCode int, body any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-	_ = json.NewEncoder(w).Encode(body)
+	httpapi.WriteJSON(w, statusCode, body)
 }
 
 func writeError(w http.ResponseWriter, statusCode int, message string) {
-	writeJSON(w, statusCode, map[string]string{"error": message})
+	httpapi.WriteError(w, statusCode, message)
 }
 
 func loginLimitKey(r *http.Request, email string) string {
@@ -170,12 +146,5 @@ func loginLimitKey(r *http.Request, email string) string {
 }
 
 func requireMethod(method string, next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != method {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			return
-		}
-
-		next.ServeHTTP(w, r)
-	})
+	return httpapi.RequireMethod(method, next)
 }

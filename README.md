@@ -116,6 +116,23 @@ go run ./cmd/create-admin -name "Nome Admin" -email "admin@example.com"
 
 O comando pede a senha e confirmacao sem ecoar no terminal. Nao crie usuarios diretamente pelo frontend nem exponha registro publico.
 
+## API de professores
+
+O gerenciamento de professores e exclusivo para usuarios autenticados com role `ADMIN`. Usuarios `PROFESSOR` recebem `403` e requisicoes sem sessao recebem `401`.
+
+Endpoints:
+
+- `GET /professors`: lista somente contas com role `PROFESSOR`.
+- `POST /professors`: cria uma conta `PROFESSOR` com `name`, `email` e `password`.
+- `PUT /professors/{id}`: atualiza somente `name` e `email`.
+- `PATCH /professors/{id}/status`: ativa ou desativa um professor.
+- `PUT /professors/{id}/password`: redefine a senha de um professor.
+- `DELETE /professors/{id}`: remove uma conta `PROFESSOR`.
+
+Esses endpoints nunca retornam `password_hash` e nunca podem alterar contas `ADMIN`. Emails sao normalizados antes de salvar. Senhas reutilizam a politica e o hash Argon2id da autenticacao. Ao desativar professor ou redefinir senha, as sessoes existentes desse professor sao invalidadas no banco na mesma transacao.
+
+Erros esperados incluem `400` para requisicao invalida, `401` para nao autenticado, `403` para role sem permissao, `404` para professor inexistente e `409` para email duplicado.
+
 ## Frontend
 
 ```bash
