@@ -6,10 +6,17 @@
     </div>
     <nav>
       @for (item of visibleNavItems(); track item.label) {
-        <button type="button" class="nav-item">
-          <i [class]="item.icon" aria-hidden="true"></i>
-          <span>{{ item.label }}</span>
-        </button>
+        @if (item.path) {
+          <a class="nav-item" [routerLink]="item.path">
+            <i [class]="item.icon" aria-hidden="true"></i>
+            <span>{{ item.label }}</span>
+          </a>
+        } @else {
+          <button type="button" class="nav-item">
+            <i [class]="item.icon" aria-hidden="true"></i>
+            <span>{{ item.label }}</span>
+          </button>
+        }
       }
     </nav>
   </aside>
@@ -30,10 +37,17 @@
     </div>
     <nav>
       @for (item of visibleNavItems(); track item.label) {
-        <button type="button" class="nav-item" (click)="drawerOpen.set(false)">
-          <i [class]="item.icon" aria-hidden="true"></i>
-          <span>{{ item.label }}</span>
-        </button>
+        @if (item.path) {
+          <a class="nav-item" [routerLink]="item.path" (click)="closeDrawer()">
+            <i [class]="item.icon" aria-hidden="true"></i>
+            <span>{{ item.label }}</span>
+          </a>
+        } @else {
+          <button type="button" class="nav-item" (click)="closeDrawer()">
+            <i [class]="item.icon" aria-hidden="true"></i>
+            <span>{{ item.label }}</span>
+          </button>
+        }
       }
     </nav>
   </aside>
@@ -69,15 +83,8 @@
       </div>
     </header>
 
-    <section class="content" aria-labelledby="welcome-title">
-      <div class="empty-state">
-        <p class="section-label">Área autenticada</p>
-        <h1 id="welcome-title">Bem-vindo(a) a Senshi Passo de Torres</h1>
-        <p>
-          Use a navegação para acessar as áreas do sistema quando os módulos forem
-          implementados.
-        </p>
-      </div>
+    <section class="content">
+      <router-outlet />
     </section>
   </main>
 </div>

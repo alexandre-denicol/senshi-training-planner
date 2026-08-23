@@ -2,13 +2,20 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router, UrlTree } from '@angular/router';
 import { AuthUser } from './auth.models';
 import { AuthService } from './auth.service';
-import { authGuard, loginGuard } from './auth.guards';
+import { adminGuard, authGuard, loginGuard } from './auth.guards';
 
 const adminUser: AuthUser = {
   id: 'admin-id',
   name: 'Admin',
   email: 'admin@example.com',
   role: 'ADMIN',
+};
+
+const professorUser: AuthUser = {
+  id: 'professor-id',
+  name: 'Professor',
+  email: 'professor@example.com',
+  role: 'PROFESSOR',
 };
 
 describe('auth guards', () => {
@@ -42,6 +49,30 @@ describe('auth guards', () => {
     const result = await TestBed.runInInjectionContext(() => loginGuard({} as never, {} as never));
 
     expect(result).toBe(true);
+  });
+
+  it('allows ADMIN access to Professores route', async () => {
+    configureGuardTest(adminUser);
+
+    const result = await TestBed.runInInjectionContext(() => adminGuard({} as never, {} as never));
+
+    expect(result).toBe(true);
+  });
+
+  it('blocks PROFESSOR access to Professores route', async () => {
+    configureGuardTest(professorUser);
+
+    const result = await TestBed.runInInjectionContext(() => adminGuard({} as never, {} as never));
+
+    expect((result as UrlTree).toString()).toBe('/app');
+  });
+
+  it('redirects unauthenticated admin route access to login', async () => {
+    configureGuardTest(null);
+
+    const result = await TestBed.runInInjectionContext(() => adminGuard({} as never, {} as never));
+
+    expect((result as UrlTree).toString()).toBe('/login');
   });
 });
 

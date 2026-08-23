@@ -1,0 +1,368 @@
+<section class="professors-page" aria-labelledby="professors-title">
+  <header class="page-header">
+    <div>
+      <h1 id="professors-title">Professores</h1>
+      <p>Gerencie os professores com acesso ao sistema.</p>
+    </div>
+
+    <button
+      pButton
+      type="button"
+      class="primary-action"
+      (click)="openCreateDialog()"
+    >
+      <i class="pi pi-plus" aria-hidden="true"></i>
+      <span>Novo professor</span>
+    </button>
+  </header>
+
+  @if (successMessage()) {
+    <p class="feedback success" role="status">{{ successMessage() }}</p>
+  }
+
+  @if (errorMessage()) {
+    <p class="feedback error" role="alert">{{ errorMessage() }}</p>
+  }
+
+  <div class="surface">
+    @if (loading()) {
+      <div class="loading-state" role="status" aria-label="Carregando professores">
+        <span class="loading-indicator" aria-hidden="true"></span>
+      </div>
+    } @else if (!hasProfessors()) {
+      <div class="empty-list">
+        <p>Nenhum professor cadastrado.</p>
+        <button pButton type="button" (click)="openCreateDialog()">
+          <i class="pi pi-plus" aria-hidden="true"></i>
+          <span>Novo professor</span>
+        </button>
+      </div>
+    } @else {
+      <table class="desktop-table">
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>E-mail</th>
+            <th>Status</th>
+            <th>Cadastro</th>
+            <th class="actions-heading">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (professor of professors(); track professor.id) {
+            <tr>
+              <td>{{ professor.name }}</td>
+              <td>{{ professor.email }}</td>
+              <td>
+                <span class="status-badge" [class.inactive]="!professor.active">{{ statusLabel(professor) }}</span>
+              </td>
+              <td>{{ formatDate(professor.createdAt) }}</td>
+              <td>
+                <div class="row-actions">
+                  <button
+                    pButton
+                    type="button"
+                    class="icon-action"
+                    aria-label="Editar professor"
+                    title="Editar"
+                    [disabled]="rowActionId() === professor.id"
+                    (click)="openEditDialog(professor)"
+                  >
+                    <i class="pi pi-pencil" aria-hidden="true"></i>
+                  </button>
+                  <button
+                    pButton
+                    type="button"
+                    class="icon-action"
+                    aria-label="Alterar senha do professor"
+                    title="Alterar senha"
+                    [disabled]="rowActionId() === professor.id"
+                    (click)="openPasswordDialog(professor)"
+                  >
+                    <i class="pi pi-key" aria-hidden="true"></i>
+                  </button>
+                  <button
+                    pButton
+                    type="button"
+                    class="icon-action"
+                    [attr.aria-label]="professor.active ? 'Desativar professor' : 'Ativar professor'"
+                    [title]="professor.active ? 'Desativar' : 'Ativar'"
+                    [disabled]="rowActionId() === professor.id"
+                    (click)="confirmStatus(professor)"
+                  >
+                    <i [class]="professor.active ? 'pi pi-ban' : 'pi pi-check-circle'" aria-hidden="true"></i>
+                  </button>
+                  <button
+                    pButton
+                    type="button"
+                    class="icon-action danger"
+                    aria-label="Excluir professor"
+                    title="Excluir"
+                    [disabled]="rowActionId() === professor.id"
+                    (click)="confirmDelete(professor)"
+                  >
+                    <i class="pi pi-trash" aria-hidden="true"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+
+      <div class="mobile-list">
+        @for (professor of professors(); track professor.id) {
+          <article class="professor-card">
+            <div>
+              <h2>{{ professor.name }}</h2>
+              <p>{{ professor.email }}</p>
+            </div>
+            <span class="status-badge" [class.inactive]="!professor.active">{{ statusLabel(professor) }}</span>
+            <dl>
+              <dt>Cadastro</dt>
+              <dd>{{ formatDate(professor.createdAt) }}</dd>
+            </dl>
+            <div class="card-actions">
+              <button
+                pButton
+                type="button"
+                class="icon-action"
+                aria-label="Editar professor"
+                title="Editar"
+                (click)="openEditDialog(professor)"
+              >
+                <i class="pi pi-pencil" aria-hidden="true"></i>
+              </button>
+              <button
+                pButton
+                type="button"
+                class="icon-action"
+                aria-label="Alterar senha do professor"
+                title="Alterar senha"
+                (click)="openPasswordDialog(professor)"
+              >
+                <i class="pi pi-key" aria-hidden="true"></i>
+              </button>
+              <button
+                pButton
+                type="button"
+                class="icon-action"
+                [attr.aria-label]="professor.active ? 'Desativar professor' : 'Ativar professor'"
+                [title]="professor.active ? 'Desativar' : 'Ativar'"
+                (click)="confirmStatus(professor)"
+              >
+                <i [class]="professor.active ? 'pi pi-ban' : 'pi pi-check-circle'" aria-hidden="true"></i>
+              </button>
+              <button
+                pButton
+                type="button"
+                class="icon-action danger"
+                aria-label="Excluir professor"
+                title="Excluir"
+                (click)="confirmDelete(professor)"
+              >
+                <i class="pi pi-trash" aria-hidden="true"></i>
+              </button>
+            </div>
+          </article>
+        }
+      </div>
+    }
+  </div>
+</section>
+
+<p-dialog
+  header="Novo professor"
+  [(visible)]="createDialogOpen"
+  [modal]="true"
+  [draggable]="false"
+  [resizable]="false"
+  styleClass="professor-dialog"
+  (onHide)="closeCreateDialog()"
+>
+  <form class="dialog-form" (ngSubmit)="createProfessor()">
+    <label>
+      <span>Nome</span>
+      <input
+        pInputText
+        type="text"
+        name="create-name"
+        autocomplete="name"
+        required
+        [(ngModel)]="createForm.name"
+      />
+    </label>
+
+    <label>
+      <span>E-mail</span>
+      <input
+        pInputText
+        type="email"
+        name="create-email"
+        autocomplete="email"
+        required
+        [(ngModel)]="createForm.email"
+      />
+    </label>
+
+    <label>
+      <span>Senha</span>
+      <input
+        pInputText
+        type="password"
+        name="create-password"
+        autocomplete="new-password"
+        required
+        [(ngModel)]="createForm.password"
+      />
+    </label>
+
+    <label>
+      <span>Confirmar senha</span>
+      <input
+        pInputText
+        type="password"
+        name="create-confirm-password"
+        autocomplete="new-password"
+        required
+        [(ngModel)]="createForm.confirmPassword"
+      />
+    </label>
+
+    <p class="form-hint">A senha precisa ter pelo menos 15 caracteres.</p>
+    @if (createForm.password && createForm.confirmPassword && createForm.password !== createForm.confirmPassword) {
+      <p class="form-error" role="alert">As senhas não conferem.</p>
+    }
+
+    <footer class="dialog-actions">
+      <button pButton type="button" class="secondary-action" (click)="closeCreateDialog()" [disabled]="submitting()">
+        Cancelar
+      </button>
+      <button pButton type="submit" [disabled]="!createFormValid() || submitting()">
+        {{ submitting() ? 'Salvando...' : 'Salvar' }}
+      </button>
+    </footer>
+  </form>
+</p-dialog>
+
+<p-dialog
+  header="Editar professor"
+  [(visible)]="editDialogOpen"
+  [modal]="true"
+  [draggable]="false"
+  [resizable]="false"
+  styleClass="professor-dialog"
+  (onHide)="closeEditDialog()"
+>
+  <form class="dialog-form" (ngSubmit)="updateProfessor()">
+    <label>
+      <span>Nome</span>
+      <input
+        pInputText
+        type="text"
+        name="edit-name"
+        autocomplete="name"
+        required
+        [(ngModel)]="editForm.name"
+      />
+    </label>
+
+    <label>
+      <span>E-mail</span>
+      <input
+        pInputText
+        type="email"
+        name="edit-email"
+        autocomplete="email"
+        required
+        [(ngModel)]="editForm.email"
+      />
+    </label>
+
+    <footer class="dialog-actions">
+      <button pButton type="button" class="secondary-action" (click)="closeEditDialog()" [disabled]="submitting()">
+        Cancelar
+      </button>
+      <button pButton type="submit" [disabled]="!editFormValid() || submitting()">
+        {{ submitting() ? 'Salvando...' : 'Salvar' }}
+      </button>
+    </footer>
+  </form>
+</p-dialog>
+
+<p-dialog
+  header="Alterar senha"
+  [(visible)]="passwordDialogOpen"
+  [modal]="true"
+  [draggable]="false"
+  [resizable]="false"
+  styleClass="professor-dialog"
+  (onHide)="closePasswordDialog()"
+>
+  <form class="dialog-form" (ngSubmit)="changePassword()">
+    <p class="form-hint">
+      A alteração de senha encerra as sessões ativas desse professor.
+    </p>
+
+    <label>
+      <span>Nova senha</span>
+      <input
+        pInputText
+        type="password"
+        name="reset-password"
+        autocomplete="new-password"
+        required
+        [(ngModel)]="passwordForm.password"
+      />
+    </label>
+
+    <label>
+      <span>Confirmar nova senha</span>
+      <input
+        pInputText
+        type="password"
+        name="reset-confirm-password"
+        autocomplete="new-password"
+        required
+        [(ngModel)]="passwordForm.confirmPassword"
+      />
+    </label>
+
+    <p class="form-hint">A senha precisa ter pelo menos 15 caracteres.</p>
+    @if (passwordForm.password && passwordForm.confirmPassword && passwordForm.password !== passwordForm.confirmPassword) {
+      <p class="form-error" role="alert">As senhas não conferem.</p>
+    }
+
+    <footer class="dialog-actions">
+      <button pButton type="button" class="secondary-action" (click)="closePasswordDialog()" [disabled]="submitting()">
+        Cancelar
+      </button>
+      <button pButton type="submit" [disabled]="!passwordFormValid() || submitting()">
+        {{ submitting() ? 'Salvando...' : 'Alterar senha' }}
+      </button>
+    </footer>
+  </form>
+</p-dialog>
+
+<p-dialog
+  [header]="confirmationTitle()"
+  [visible]="confirmation() !== null"
+  [modal]="true"
+  [draggable]="false"
+  [resizable]="false"
+  styleClass="professor-dialog"
+  (onHide)="cancelConfirmation()"
+>
+  <div class="confirmation-body">
+    <p>{{ confirmationText() }}</p>
+  </div>
+
+  <footer class="dialog-actions">
+    <button pButton type="button" class="secondary-action" (click)="cancelConfirmation()" [disabled]="submitting()">
+      Cancelar
+    </button>
+    <button pButton type="button" [class.danger-action]="confirmation()?.kind === 'delete'" (click)="applyConfirmation()" [disabled]="submitting()">
+      {{ submitting() ? 'Processando...' : 'Confirmar' }}
+    </button>
+  </footer>
+</p-dialog>
