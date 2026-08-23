@@ -112,6 +112,9 @@ func (s *PostgresStore) DeleteCategory(ctx context.Context, id string) error {
 	const query = `DELETE FROM categories WHERE id = $1`
 
 	commandTag, err := s.pool.Exec(ctx, query, id)
+	if categoryInUseViolation(err) {
+		return ErrInUse
+	}
 	if err != nil {
 		return err
 	}
@@ -145,4 +148,9 @@ func scanCategory(row categoryScanner) (Category, error) {
 func categoryNameUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == categoryNameUniqueIndex
+}
+
+func categoryInUseViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23503" && pgErr.ConstraintName == "blocks_category_id_fkey"
 }

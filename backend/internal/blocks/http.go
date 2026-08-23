@@ -1,4 +1,4 @@
-package categories
+package blocks
 
 import (
 	"errors"
@@ -30,7 +30,7 @@ func (h *Handler) Collection(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Resource(w http.ResponseWriter, r *http.Request) {
 	segments := resourceSegments(r.URL.Path)
 	if len(segments) == 0 {
-		httpapi.WriteError(w, http.StatusNotFound, "category not found")
+		httpapi.WriteError(w, http.StatusNotFound, "block not found")
 		return
 	}
 
@@ -56,17 +56,17 @@ func (h *Handler) Resource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	httpapi.WriteError(w, http.StatusNotFound, "category not found")
+	httpapi.WriteError(w, http.StatusNotFound, "block not found")
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
-	categories, err := h.service.List(r.Context())
+	blocks, err := h.service.List(r.Context())
 	if err != nil {
 		httpapi.WriteError(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
 
-	httpapi.WriteJSON(w, http.StatusOK, categories)
+	httpapi.WriteJSON(w, http.StatusOK, blocks)
 }
 
 func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
@@ -76,8 +76,8 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	category, err := h.service.Create(r.Context(), input)
-	writeCategoryResult(w, http.StatusCreated, category, err)
+	block, err := h.service.Create(r.Context(), input)
+	writeBlockResult(w, http.StatusCreated, block, err)
 }
 
 func (h *Handler) update(w http.ResponseWriter, r *http.Request, id string) {
@@ -87,8 +87,8 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request, id string) {
 		return
 	}
 
-	category, err := h.service.Update(r.Context(), id, input)
-	writeCategoryResult(w, http.StatusOK, category, err)
+	block, err := h.service.Update(r.Context(), id, input)
+	writeBlockResult(w, http.StatusOK, block, err)
 }
 
 func (h *Handler) setStatus(w http.ResponseWriter, r *http.Request, id string) {
@@ -98,8 +98,8 @@ func (h *Handler) setStatus(w http.ResponseWriter, r *http.Request, id string) {
 		return
 	}
 
-	category, err := h.service.SetStatus(r.Context(), id, input)
-	writeCategoryResult(w, http.StatusOK, category, err)
+	block, err := h.service.SetStatus(r.Context(), id, input)
+	writeBlockResult(w, http.StatusOK, block, err)
 }
 
 func (h *Handler) delete(w http.ResponseWriter, r *http.Request, id string) {
@@ -107,18 +107,16 @@ func (h *Handler) delete(w http.ResponseWriter, r *http.Request, id string) {
 	writeEmptyResult(w, err)
 }
 
-func writeCategoryResult(w http.ResponseWriter, successStatus int, category Category, err error) {
+func writeBlockResult(w http.ResponseWriter, successStatus int, block Block, err error) {
 	switch {
 	case err == nil:
-		httpapi.WriteJSON(w, successStatus, category)
-	case errors.Is(err, ErrInvalidRequest):
+		httpapi.WriteJSON(w, successStatus, block)
+	case errors.Is(err, ErrInvalidRequest), errors.Is(err, ErrInvalidCategory):
 		httpapi.WriteError(w, http.StatusBadRequest, "invalid request")
 	case errors.Is(err, ErrNameExists):
-		httpapi.WriteError(w, http.StatusConflict, "category name already exists")
+		httpapi.WriteError(w, http.StatusConflict, "block name already exists in category")
 	case errors.Is(err, ErrNotFound):
-		httpapi.WriteError(w, http.StatusNotFound, "category not found")
-	case errors.Is(err, ErrInUse):
-		httpapi.WriteError(w, http.StatusConflict, "category is in use")
+		httpapi.WriteError(w, http.StatusNotFound, "block not found")
 	default:
 		httpapi.WriteError(w, http.StatusInternalServerError, "internal server error")
 	}
@@ -131,16 +129,14 @@ func writeEmptyResult(w http.ResponseWriter, err error) {
 	case errors.Is(err, ErrInvalidRequest):
 		httpapi.WriteError(w, http.StatusBadRequest, "invalid request")
 	case errors.Is(err, ErrNotFound):
-		httpapi.WriteError(w, http.StatusNotFound, "category not found")
-	case errors.Is(err, ErrInUse):
-		httpapi.WriteError(w, http.StatusConflict, "category is in use")
+		httpapi.WriteError(w, http.StatusNotFound, "block not found")
 	default:
 		httpapi.WriteError(w, http.StatusInternalServerError, "internal server error")
 	}
 }
 
 func resourceSegments(path string) []string {
-	resource := strings.TrimPrefix(path, "/categories/")
+	resource := strings.TrimPrefix(path, "/blocks/")
 	resource = strings.Trim(resource, "/")
 	if resource == "" {
 		return nil

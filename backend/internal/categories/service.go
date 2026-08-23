@@ -97,6 +97,9 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 	if errors.Is(err, ErrNotFound) {
 		return ErrNotFound
 	}
+	if errors.Is(err, ErrInUse) {
+		return ErrInUse
+	}
 	return err
 }
 
