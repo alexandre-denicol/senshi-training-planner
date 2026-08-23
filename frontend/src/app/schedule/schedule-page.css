@@ -229,6 +229,16 @@ h1 {
   min-height: 2.35rem;
 }
 
+.detail-action {
+  align-items: center;
+  background: #20242b;
+  border-color: #343a45;
+  color: #dbe5f3;
+  display: inline-flex;
+  gap: 0.45rem;
+  min-height: 2.35rem;
+}
+
 .danger,
 .danger-action {
   color: #fecaca;
@@ -312,6 +322,93 @@ h1 {
   color: #94a3b8;
   line-height: 1.45;
   margin: 0;
+}
+
+.workout-detail-body {
+  display: grid;
+  gap: 1rem;
+  min-width: min(34rem, calc(100vw - 3rem));
+}
+
+.detail-loading {
+  align-items: center;
+  display: grid;
+  gap: 0.75rem;
+  justify-items: center;
+  min-height: 8rem;
+}
+
+.detail-loading p {
+  color: #94a3b8;
+  margin: 0;
+}
+
+.workout-blocks {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.workout-blocks h3 {
+  color: #fff;
+  font-size: 1rem;
+  margin: 0;
+}
+
+.workout-blocks ol {
+  display: grid;
+  gap: 0.65rem;
+  list-style: none;
+  margin: 0;
+  max-height: min(52vh, 28rem);
+  overflow-y: auto;
+  padding: 0;
+}
+
+.workout-blocks li {
+  align-items: start;
+  background: #111418;
+  border: 1px solid #2a3039;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: auto 1fr;
+  min-width: 0;
+  padding: 0.75rem;
+}
+
+.block-position {
+  align-items: center;
+  background: rgba(20, 184, 166, 0.12);
+  border: 1px solid rgba(94, 234, 212, 0.34);
+  color: #9ff5e8;
+  display: inline-flex;
+  font-weight: 850;
+  height: 2rem;
+  justify-content: center;
+  width: 2rem;
+}
+
+.block-content {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.block-content strong {
+  color: #f8fafc;
+  overflow-wrap: anywhere;
+}
+
+.block-content small,
+.block-content em {
+  color: #94a3b8;
+  font-size: 0.85rem;
+  font-style: normal;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.block-content em {
+  color: #fbbf24;
 }
 
 .participant-editor {
@@ -442,5 +539,9 @@ textarea:focus-visible {
 
   .participant-add-row button {
     justify-content: center;
+  }
+
+  .workout-detail-body {
+    min-width: 0;
   }
 }

@@ -31,15 +31,15 @@ describe('AppShell', () => {
     expect(fixture.nativeElement.textContent).toContain('Treinos');
   });
 
-  it('does not show management navigation for PROFESSOR', async () => {
+  it('shows operational navigation but not Professores for PROFESSOR', async () => {
     const fixture = await renderShell(professorUser);
 
     expect(fixture.nativeElement.textContent).toContain('Agenda');
     expect(fixture.nativeElement.textContent).toContain('Histórico');
+    expect(fixture.nativeElement.textContent).toContain('Categorias');
+    expect(fixture.nativeElement.textContent).toContain('Blocos');
+    expect(fixture.nativeElement.textContent).toContain('Treinos');
     expect(fixture.nativeElement.textContent).not.toContain('Professores');
-    expect(fixture.nativeElement.textContent).not.toContain('Categorias');
-    expect(fixture.nativeElement.textContent).not.toContain('Blocos');
-    expect(fixture.nativeElement.textContent).not.toContain('Treinos');
   });
 });
 

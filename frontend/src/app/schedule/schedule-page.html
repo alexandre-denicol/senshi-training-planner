@@ -5,7 +5,7 @@
       <p>Planeje os treinos por data.</p>
     </div>
 
-    @if (isAdmin()) {
+    @if (canManageSchedule()) {
       <button
         pButton
         type="button"
@@ -38,7 +38,7 @@
     <p class="feedback error" role="alert">{{ errorMessage() }}</p>
   }
 
-  @if (isAdmin() && !loading() && !hasActiveWorkouts()) {
+  @if (canManageSchedule() && !loading() && !hasActiveWorkouts()) {
     <p class="feedback notice" role="status">Cadastre ou ative pelo menos um treino antes de agendar.</p>
   }
 
@@ -50,7 +50,7 @@
     } @else if (!hasEntries()) {
       <div class="empty-list">
         <p>Nenhum treino agendado neste período.</p>
-        @if (isAdmin()) {
+        @if (canManageSchedule()) {
           <button pButton type="button" [disabled]="!hasActiveWorkouts()" (click)="openCreateDialog()">
             <i class="pi pi-plus" aria-hidden="true"></i>
             <span>Agendar treino</span>
@@ -81,11 +81,15 @@
 
                   @if (!isCompleted(entry)) {
                     <div class="row-actions">
+                      <button pButton type="button" class="detail-action" [disabled]="workoutDetailLoadingEntryId() === entry.id" (click)="openWorkoutDetail(entry)">
+                        <i class="pi pi-eye" aria-hidden="true"></i>
+                        <span>Ver treino</span>
+                      </button>
                       <button pButton type="button" class="complete-action" [disabled]="rowActionId() === entry.id" (click)="confirmComplete(entry)">
                         <i class="pi pi-check-circle" aria-hidden="true"></i>
                         <span>Marcar como realizado</span>
                       </button>
-                      @if (isAdmin()) {
+                      @if (canManageSchedule()) {
                         <button
                           pButton
                           type="button"
@@ -299,6 +303,58 @@
       </footer>
     </form>
   }
+</p-dialog>
+
+<p-dialog
+  header="Detalhes do treino"
+  [visible]="workoutDetailDialogOpen()"
+  [modal]="true"
+  [draggable]="false"
+  [resizable]="false"
+  styleClass="schedule-dialog workout-detail-dialog"
+  (onHide)="closeWorkoutDetailDialog()"
+>
+  @if (workoutDetailEntry; as entry) {
+    <div class="workout-detail-body">
+      <div class="completion-summary">
+        <h2>{{ workoutDetail()?.name ?? entry.workout.name }}</h2>
+        <p>{{ formatDate(entry.scheduledDate) }}</p>
+      </div>
+
+      @if (workoutDetailLoading()) {
+        <div class="detail-loading" role="status" aria-label="Carregando detalhes do treino">
+          <span class="loading-indicator" aria-hidden="true"></span>
+          <p>Carregando detalhes do treino...</p>
+        </div>
+      } @else if (workoutDetailError()) {
+        <p class="dialog-error" role="alert">{{ workoutDetailError() }}</p>
+      } @else if (workoutDetail(); as workout) {
+        <section class="workout-blocks" aria-labelledby="workout-blocks-title">
+          <h3 id="workout-blocks-title">Blocos do treino</h3>
+          <ol>
+            @for (block of workout.blocks; track block.id) {
+              <li>
+                <span class="block-position">{{ block.position }}</span>
+                <span class="block-content">
+                  <strong>{{ block.name }}</strong>
+                  <small>Categoria: {{ block.category.name }}</small>
+                  @if (!block.active) {
+                    <em>Bloco inativo</em>
+                  }
+                </span>
+              </li>
+            }
+          </ol>
+        </section>
+      }
+    </div>
+  }
+
+  <footer class="dialog-actions">
+    <button pButton type="button" class="secondary-action" (click)="closeWorkoutDetailDialog()">
+      Fechar
+    </button>
+  </footer>
 </p-dialog>
 
 <p-dialog

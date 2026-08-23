@@ -19,9 +19,9 @@ export const routes: Routes = [
     children: [
       { path: '', pathMatch: 'full', component: WelcomePage },
       { path: 'agenda', component: SchedulePage },
-      { path: 'treinos', component: WorkoutsPage, canActivate: [adminGuard] },
-      { path: 'blocos', component: BlocksPage, canActivate: [adminGuard] },
-      { path: 'categorias', component: CategoriesPage, canActivate: [adminGuard] },
+      { path: 'treinos', component: WorkoutsPage },
+      { path: 'blocos', component: BlocksPage },
+      { path: 'categorias', component: CategoriesPage },
       { path: 'historico', component: HistoryPage },
       { path: 'professores', component: ProfessorsPage, canActivate: [adminGuard] },
     ],

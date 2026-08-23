@@ -17,11 +17,33 @@ func TestWorkoutHTTPAuthorization(t *testing.T) {
 	if response := performUnauthenticatedWorkoutRequest(t, &fakeWorkoutService{}, http.MethodGet, "/workouts", ""); response.Code != http.StatusUnauthorized {
 		t.Fatalf("expected unauthenticated status 401, got %d", response.Code)
 	}
-	if response := performWorkoutRequest(t, auth.RoleProfessor, &fakeWorkoutService{}, http.MethodGet, "/workouts", ""); response.Code != http.StatusForbidden {
-		t.Fatalf("expected professor status 403, got %d", response.Code)
+	if response := performUnauthenticatedWorkoutRequest(t, &fakeWorkoutService{}, http.MethodGet, "/workouts/"+workoutID, ""); response.Code != http.StatusUnauthorized {
+		t.Fatalf("expected unauthenticated detail status 401, got %d", response.Code)
+	}
+	if response := performWorkoutRequest(t, auth.RoleProfessor, &fakeWorkoutService{}, http.MethodGet, "/workouts", ""); response.Code != http.StatusOK {
+		t.Fatalf("expected professor list status 200, got %d", response.Code)
 	}
 	if response := performWorkoutRequest(t, auth.RoleAdmin, &fakeWorkoutService{}, http.MethodGet, "/workouts", ""); response.Code != http.StatusOK {
 		t.Fatalf("expected admin status 200, got %d", response.Code)
+	}
+	service := &fakeWorkoutService{detailWorkout: workoutFixture(workoutID, "Treino", []string{blockIDOne, blockIDTwo})}
+	if response := performWorkoutRequest(t, auth.RoleAdmin, service, http.MethodGet, "/workouts/"+workoutID, ""); response.Code != http.StatusOK {
+		t.Fatalf("expected admin detail status 200, got %d", response.Code)
+	}
+	if response := performWorkoutRequest(t, auth.RoleProfessor, service, http.MethodGet, "/workouts/"+workoutID, ""); response.Code != http.StatusOK {
+		t.Fatalf("expected professor detail status 200, got %d", response.Code)
+	}
+	if response := performWorkoutRequest(t, auth.RoleProfessor, service, http.MethodPost, "/workouts", `{"name":"Novo","blockIds":["`+blockIDOne+`"]}`); response.Code != http.StatusCreated {
+		t.Fatalf("expected professor create status 201, got %d", response.Code)
+	}
+	if response := performWorkoutRequest(t, auth.RoleProfessor, service, http.MethodPut, "/workouts/"+workoutID, `{"name":"Editado","blockIds":["`+blockIDOne+`"]}`); response.Code != http.StatusOK {
+		t.Fatalf("expected professor update status 200, got %d", response.Code)
+	}
+	if response := performWorkoutRequest(t, auth.RoleProfessor, service, http.MethodPatch, "/workouts/"+workoutID+"/status", `{"active":false}`); response.Code != http.StatusOK {
+		t.Fatalf("expected professor status mutation 200, got %d", response.Code)
+	}
+	if response := performWorkoutRequest(t, auth.RoleProfessor, service, http.MethodDelete, "/workouts/"+workoutID, ""); response.Code != http.StatusNoContent {
+		t.Fatalf("expected professor delete status 204, got %d", response.Code)
 	}
 }
 
@@ -46,8 +68,22 @@ func TestWorkoutHTTPListDetailCreateDuplicateUpdateStatusDeleteAndNotFound(t *te
 	if detail.Code != http.StatusOK {
 		t.Fatalf("expected detail 200, got %d", detail.Code)
 	}
+	if service.detailID != workoutID {
+		t.Fatalf("expected detail id %s, got %s", workoutID, service.detailID)
+	}
 	if !strings.Contains(detail.Body.String(), `"position":1`) || !strings.Contains(detail.Body.String(), `"position":2`) {
 		t.Fatalf("expected ordered detail positions, got %s", detail.Body.String())
+	}
+
+	service.detailWorkout = workoutFixture(workoutID, "Treino Inativo", []string{blockIDOne, inactiveBlockID})
+	service.detailWorkout.Active = false
+	service.detailWorkout.Blocks[1].Active = false
+	inactiveDetail := performWorkoutRequest(t, auth.RoleProfessor, service, http.MethodGet, "/workouts/"+workoutID, "")
+	if inactiveDetail.Code != http.StatusOK {
+		t.Fatalf("expected inactive detail 200, got %d", inactiveDetail.Code)
+	}
+	if !strings.Contains(inactiveDetail.Body.String(), `"active":false`) || !strings.Contains(inactiveDetail.Body.String(), inactiveBlockID) {
+		t.Fatalf("expected inactive workout and block to remain readable, got %s", inactiveDetail.Body.String())
 	}
 
 	create := performWorkoutRequest(t, auth.RoleAdmin, service, http.MethodPost, "/workouts", `{"name":"Novo","blockIds":["`+blockIDOne+`","`+blockIDTwo+`"]}`)
@@ -148,11 +184,8 @@ func performRequest(t *testing.T, user *auth.PublicUser, service ServiceAPI, met
 	workoutHandler := NewHandler(service)
 
 	mux := http.NewServeMux()
-	adminOnly := func(next http.Handler) http.Handler {
-		return authHandler.Authenticate(auth.RequireAdmin(next))
-	}
-	mux.Handle("/workouts", adminOnly(http.HandlerFunc(workoutHandler.Collection)))
-	mux.Handle("/workouts/", adminOnly(http.HandlerFunc(workoutHandler.Resource)))
+	mux.Handle("/workouts", authHandler.Authenticate(http.HandlerFunc(workoutHandler.Collection)))
+	mux.Handle("/workouts/", authHandler.Authenticate(http.HandlerFunc(workoutHandler.Resource)))
 
 	request := httptest.NewRequest(method, path, strings.NewReader(body))
 	if user != nil {
@@ -176,6 +209,7 @@ type fakeWorkoutService struct {
 	updateID       string
 	statusInput    StatusInput
 	deleteID       string
+	detailID       string
 	detailErr      error
 	createErr      error
 	updateErr      error
@@ -186,7 +220,8 @@ func (s *fakeWorkoutService) List(context.Context) ([]WorkoutListItem, error) {
 	return s.workouts, nil
 }
 
-func (s *fakeWorkoutService) Get(context.Context, string) (WorkoutDetail, error) {
+func (s *fakeWorkoutService) Get(_ context.Context, id string) (WorkoutDetail, error) {
+	s.detailID = id
 	if s.detailErr != nil {
 		return WorkoutDetail{}, s.detailErr
 	}

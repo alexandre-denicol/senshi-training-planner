@@ -4,7 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { AuthUser } from '../auth/auth.models';
 import { AuthService } from '../auth/auth.service';
-import { WorkoutApiService, WorkoutListItem } from '../workouts/workout-api.service';
+import { WorkoutApiService, WorkoutDetail, WorkoutListItem } from '../workouts/workout-api.service';
 import { ScheduleApiService, ScheduleEntry } from './schedule-api.service';
 import { SchedulePage } from './schedule-page';
 
@@ -30,17 +30,18 @@ describe('SchedulePage', () => {
     expect(fixture.nativeElement.textContent).toContain('Agendar treino');
   });
 
-  it('allows PROFESSOR completion access without schedule edit/delete controls or workout option loading', async () => {
+  it('allows PROFESSOR operational access with schedule and completion controls', async () => {
     const workoutApi = new FakeWorkoutApi([workout()]);
     const { fixture } = await renderPage(professorUser, [entry()], [workout()], undefined, workoutApi);
     const text = fixture.nativeElement.textContent;
 
     expect(text).toContain('Treino Base');
+    expect(text).toContain('Agendar treino');
+    expect(text).toContain('Ver treino');
     expect(text).toContain('Marcar como realizado');
-    expect(text).not.toContain('Agendar treino');
-    expect(text).not.toContain('Editar');
-    expect(text).not.toContain('Remover');
-    expect(workoutApi.listCalls).toBe(0);
+    expect(fixture.nativeElement.querySelector('button[aria-label="Editar agendamento"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('button[aria-label="Remover agendamento"]')).toBeTruthy();
+    expect(workoutApi.listCalls).toBeGreaterThan(0);
   });
 
   it('shows empty state', async () => {
@@ -64,6 +65,97 @@ describe('SchedulePage', () => {
     expect(text).toContain('Treino A');
     expect(text).toContain('Treino B');
     expect(text).toContain('Treino C');
+  });
+
+  it('opens scheduled workout detail for ADMIN with loading state, ordered blocks and categories', async () => {
+    const original = entry({ id: 'entry-1', workout: { id: 'workout-1', name: 'Treino Técnico', active: true } });
+    const workoutApi = new FakeWorkoutApi([workout()]);
+    workoutApi.detailGate = pendingPromise();
+    workoutApi.details.set('workout-1', workoutDetail({
+      id: 'workout-1',
+      name: 'Treino Técnico',
+      blocks: [
+        workoutBlock({ id: 'block-1', name: 'Aquecimento', position: 1, category: { id: 'category-1', name: 'Preparação' } }),
+        workoutBlock({ id: 'block-2', name: 'Combinações de jab e direto com nome bastante longo para validar quebra natural', position: 2, category: { id: 'category-2', name: 'Técnica' } }),
+        workoutBlock({ id: 'block-3', name: 'Alongamento', active: false, position: 3, category: { id: 'category-3', name: 'Finalização' } }),
+      ],
+    }));
+    const { fixture, component } = await renderPage(adminUser, [original], [workout()], undefined, workoutApi);
+
+    const loading = component.openWorkoutDetail(original);
+    fixture.detectChanges();
+
+    expect(workoutApi.loadedDetails).toEqual(['workout-1']);
+    expect(component.workoutDetailDialogOpen()).toBe(true);
+    expect(fixture.nativeElement.textContent).toContain('Detalhes do treino');
+    expect(fixture.nativeElement.textContent).toContain('Carregando detalhes do treino');
+
+    workoutApi.detailGate.resolve();
+    await loading;
+    fixture.detectChanges();
+
+    const detailText = detailBodyText(fixture.nativeElement);
+    expect(detailText).toContain('Treino Técnico');
+    expect(detailText).toContain('24/08/2026');
+    expect(detailText).toContain('Blocos do treino');
+    expect(detailText).toContain('Aquecimento');
+    expect(detailText).toContain('Categoria: Preparação');
+    expect(detailText).toContain('Combinações de jab e direto');
+    expect(detailText).toContain('Categoria: Técnica');
+    expect(detailText).toContain('Alongamento');
+    expect(detailText).toContain('Bloco inativo');
+    expect(detailText.indexOf('Aquecimento')).toBeLessThan(detailText.indexOf('Combinações de jab'));
+    expect(detailText.indexOf('Combinações de jab')).toBeLessThan(detailText.indexOf('Alongamento'));
+    expect(detailText).not.toContain('Editar');
+    expect(detailText).not.toContain('Excluir');
+    expect(detailText).not.toContain('Salvar');
+  });
+
+  it('opens scheduled workout detail for PROFESSOR while retaining agenda management data', async () => {
+    const original = entry({ id: 'entry-1', workout: { id: 'workout-1', name: 'Treino Técnico', active: true } });
+    const workoutApi = new FakeWorkoutApi([]);
+    workoutApi.details.set('workout-1', workoutDetail({ id: 'workout-1', name: 'Treino Técnico' }));
+    const { fixture, component } = await renderPage(professorUser, [original], [], undefined, workoutApi);
+
+    await component.openWorkoutDetail(original);
+    fixture.detectChanges();
+
+    expect(workoutApi.listCalls).toBeGreaterThan(0);
+    expect(workoutApi.loadedDetails).toEqual(['workout-1']);
+    expect(detailBodyText(fixture.nativeElement)).toContain('Treino Técnico');
+  });
+
+  it('prevents repeated workout detail requests while the same entry is loading', async () => {
+    const original = entry({ id: 'entry-1', workout: { id: 'workout-1', name: 'Treino Técnico', active: true } });
+    const workoutApi = new FakeWorkoutApi([]);
+    workoutApi.detailGate = pendingPromise();
+    const { component } = await renderPage(adminUser, [original], [workout()], undefined, workoutApi);
+
+    const first = component.openWorkoutDetail(original);
+    const second = component.openWorkoutDetail(original);
+
+    expect(workoutApi.loadedDetails).toEqual(['workout-1']);
+    workoutApi.detailGate.resolve();
+    await first;
+    await second;
+  });
+
+  it('shows safe workout detail load errors and clears dialog state on close', async () => {
+    const original = entry({ id: 'entry-1', workout: { id: 'missing-workout', name: 'Treino Removido', active: true } });
+    const workoutApi = new FakeWorkoutApi([]);
+    workoutApi.detailError = new HttpErrorResponse({ status: 404, statusText: 'Not Found' });
+    const { fixture, component } = await renderPage(adminUser, [original], [workout()], undefined, workoutApi);
+
+    await component.openWorkoutDetail(original);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Treino não encontrado.');
+    component.closeWorkoutDetailDialog();
+
+    expect(component.workoutDetailDialogOpen()).toBe(false);
+    expect(component.workoutDetail()).toBeNull();
+    expect(component.workoutDetailError()).toBe('');
+    expect(component.workoutDetailEntry).toBeNull();
   });
 
   it('formats API DATE values without timezone shifting', async () => {
@@ -449,6 +541,7 @@ describe('SchedulePage', () => {
     const text = fixture.nativeElement.textContent;
 
     expect(text).toContain('Realizado');
+    expect(text).not.toContain('Ver treino');
     expect(text).not.toContain('Marcar como realizado');
     expect(text).not.toContain('Editar');
     expect(text).not.toContain('Remover');
@@ -660,6 +753,10 @@ function clickButton(root: HTMLElement, text: string): void {
 
 class FakeWorkoutApi {
   listCalls = 0;
+  loadedDetails: string[] = [];
+  details = new Map<string, WorkoutDetail>();
+  detailError: unknown = null;
+  detailGate: DeferredPromise | null = null;
 
   constructor(private workouts: WorkoutListItem[]) {}
 
@@ -667,4 +764,47 @@ class FakeWorkoutApi {
     this.listCalls += 1;
     return this.workouts;
   }
+
+  async getById(id: string): Promise<WorkoutDetail> {
+    this.loadedDetails.push(id);
+    if (this.detailError) {
+      throw this.detailError;
+    }
+    if (this.detailGate) {
+      await this.detailGate.promise;
+    }
+    return this.details.get(id) ?? workoutDetail({ id });
+  }
+}
+
+function workoutDetail(overrides: Partial<WorkoutDetail> = {}): WorkoutDetail {
+  return {
+    id: 'workout-id',
+    name: 'Treino Base',
+    active: true,
+    blocks: [workoutBlock()],
+    createdAt: '2026-08-23T00:00:00Z',
+    updatedAt: '2026-08-23T00:00:00Z',
+    ...overrides,
+  };
+}
+
+function workoutBlock(overrides: Partial<WorkoutDetail['blocks'][number]> = {}): WorkoutDetail['blocks'][number] {
+  return {
+    id: 'block-id',
+    name: 'Bloco Base',
+    active: true,
+    position: 1,
+    category: { id: 'category-id', name: 'Categoria Base' },
+    ...overrides,
+  };
+}
+
+function detailBodyText(root: HTMLElement): string {
+  const body = root.querySelector('.workout-detail-body');
+  if (!body) {
+    throw new Error('workout detail body not found');
+  }
+
+  return body.textContent ?? '';
 }

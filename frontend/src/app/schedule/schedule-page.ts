@@ -7,7 +7,7 @@ import { ButtonModule } from 'primeng/button';
 import { DialogModule } from 'primeng/dialog';
 import { InputTextModule } from 'primeng/inputtext';
 import { AuthService } from '../auth/auth.service';
-import { WorkoutApiService, WorkoutListItem } from '../workouts/workout-api.service';
+import { WorkoutApiService, WorkoutDetail, WorkoutListItem } from '../workouts/workout-api.service';
 import { CompletionDetails, ScheduleApiService, ScheduleEntry, ScheduleWorkout } from './schedule-api.service';
 
 interface ScheduleForm {
@@ -56,7 +56,11 @@ export class SchedulePage implements OnInit {
   protected readonly successMessage = signal('');
   protected readonly confirmation = signal<ConfirmationState | null>(null);
   protected readonly completionFormError = signal('');
-  protected readonly isAdmin = computed(() => this.auth.currentUser()?.role === 'ADMIN');
+  protected readonly workoutDetail = signal<WorkoutDetail | null>(null);
+  protected readonly workoutDetailLoading = signal(false);
+  protected readonly workoutDetailError = signal('');
+  protected readonly workoutDetailLoadingEntryId = signal<string | null>(null);
+  protected readonly canManageSchedule = computed(() => this.auth.currentUser() !== null);
   protected readonly hasEntries = computed(() => this.entries().length > 0);
   protected readonly activeWorkouts = computed(() => this.workouts().filter((workout) => workout.active));
   protected readonly hasActiveWorkouts = computed(() => this.activeWorkouts().length > 0);
@@ -66,8 +70,10 @@ export class SchedulePage implements OnInit {
   protected createDialogOpen = false;
   protected editDialogOpen = false;
   protected readonly completeDialogOpen = signal(false);
+  protected readonly workoutDetailDialogOpen = signal(false);
   protected selectedEntry: ScheduleEntry | null = null;
   protected completionEntry: ScheduleEntry | null = null;
+  protected workoutDetailEntry: ScheduleEntry | null = null;
   protected createForm = this.emptyForm();
   protected editForm = this.emptyForm();
   protected completionForm = this.emptyCompletionForm();
@@ -83,14 +89,9 @@ export class SchedulePage implements OnInit {
     try {
       const range = monthRange(this.currentMonth());
       const entriesPromise = this.api.list(range.from, range.to);
-      if (this.isAdmin()) {
-        const [entries, workouts] = await Promise.all([entriesPromise, this.workoutApi.list()]);
-        this.entries.set(entries);
-        this.workouts.set(workouts);
-      } else {
-        this.entries.set(await entriesPromise);
-        this.workouts.set([]);
-      }
+      const [entries, workouts] = await Promise.all([entriesPromise, this.workoutApi.list()]);
+      this.entries.set(entries);
+      this.workouts.set(workouts);
     } catch (error) {
       await this.handleRequestError(error);
     } finally {
@@ -216,6 +217,38 @@ export class SchedulePage implements OnInit {
     this.completionEntry = null;
     this.completionForm = this.emptyCompletionForm();
     this.completionFormError.set('');
+  }
+
+  protected async openWorkoutDetail(entry: ScheduleEntry): Promise<void> {
+    if (this.isCompleted(entry) || this.workoutDetailLoadingEntryId() === entry.id) {
+      return;
+    }
+
+    this.clearMessages();
+    this.workoutDetailEntry = entry;
+    this.workoutDetail.set(null);
+    this.workoutDetailError.set('');
+    this.workoutDetailDialogOpen.set(true);
+    this.workoutDetailLoading.set(true);
+    this.workoutDetailLoadingEntryId.set(entry.id);
+
+    try {
+      this.workoutDetail.set(await this.workoutApi.getById(entry.workout.id));
+    } catch (error) {
+      await this.handleWorkoutDetailError(error);
+    } finally {
+      this.workoutDetailLoading.set(false);
+      this.workoutDetailLoadingEntryId.set(null);
+    }
+  }
+
+  protected closeWorkoutDetailDialog(): void {
+    this.workoutDetailDialogOpen.set(false);
+    this.workoutDetailEntry = null;
+    this.workoutDetail.set(null);
+    this.workoutDetailError.set('');
+    this.workoutDetailLoading.set(false);
+    this.workoutDetailLoadingEntryId.set(null);
   }
 
   protected addParticipantName(input?: HTMLInputElement): void {
@@ -398,6 +431,25 @@ export class SchedulePage implements OnInit {
     }
 
     this.errorMessage.set('Não foi possível concluir a operação. Tente novamente.');
+  }
+
+  private async handleWorkoutDetailError(error: unknown): Promise<void> {
+    if (error instanceof HttpErrorResponse) {
+      if (error.status === 401) {
+        await this.router.navigateByUrl('/login');
+        return;
+      }
+      if (error.status === 403) {
+        await this.router.navigateByUrl('/app');
+        return;
+      }
+      if (error.status === 404) {
+        this.workoutDetailError.set('Treino não encontrado.');
+        return;
+      }
+    }
+
+    this.workoutDetailError.set('Não foi possível carregar os detalhes do treino. Tente novamente.');
   }
 
   private isConflict(error: unknown): boolean {

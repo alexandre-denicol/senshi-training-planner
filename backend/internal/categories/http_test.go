@@ -17,11 +17,23 @@ func TestCategoryHTTPAuthorization(t *testing.T) {
 	if response := performUnauthenticatedCategoryRequest(t, &fakeCategoryService{}, http.MethodGet, "/categories", ""); response.Code != http.StatusUnauthorized {
 		t.Fatalf("expected unauthenticated status 401, got %d", response.Code)
 	}
-	if response := performCategoryRequest(t, auth.RoleProfessor, &fakeCategoryService{}, http.MethodGet, "/categories", ""); response.Code != http.StatusForbidden {
-		t.Fatalf("expected professor status 403, got %d", response.Code)
+	if response := performCategoryRequest(t, auth.RoleProfessor, &fakeCategoryService{}, http.MethodGet, "/categories", ""); response.Code != http.StatusOK {
+		t.Fatalf("expected professor list status 200, got %d", response.Code)
 	}
 	if response := performCategoryRequest(t, auth.RoleAdmin, &fakeCategoryService{}, http.MethodGet, "/categories", ""); response.Code != http.StatusOK {
 		t.Fatalf("expected admin status 200, got %d", response.Code)
+	}
+	if response := performCategoryRequest(t, auth.RoleProfessor, &fakeCategoryService{createdCategory: Category{ID: categoryID, Name: "Técnica", Active: true}}, http.MethodPost, "/categories", `{"name":"Técnica"}`); response.Code != http.StatusCreated {
+		t.Fatalf("expected professor create status 201, got %d", response.Code)
+	}
+	if response := performCategoryRequest(t, auth.RoleProfessor, &fakeCategoryService{}, http.MethodPut, "/categories/"+categoryID, `{"name":"Mobilidade"}`); response.Code != http.StatusOK {
+		t.Fatalf("expected professor update status 200, got %d", response.Code)
+	}
+	if response := performCategoryRequest(t, auth.RoleProfessor, &fakeCategoryService{}, http.MethodPatch, "/categories/"+categoryID+"/status", `{"active":false}`); response.Code != http.StatusOK {
+		t.Fatalf("expected professor status update 200, got %d", response.Code)
+	}
+	if response := performCategoryRequest(t, auth.RoleProfessor, &fakeCategoryService{}, http.MethodDelete, "/categories/"+categoryID, ""); response.Code != http.StatusNoContent {
+		t.Fatalf("expected professor delete status 204, got %d", response.Code)
 	}
 }
 
@@ -129,11 +141,8 @@ func performRequest(t *testing.T, user *auth.PublicUser, service ServiceAPI, met
 	categoryHandler := NewHandler(service)
 
 	mux := http.NewServeMux()
-	adminOnly := func(next http.Handler) http.Handler {
-		return authHandler.Authenticate(auth.RequireAdmin(next))
-	}
-	mux.Handle("/categories", adminOnly(http.HandlerFunc(categoryHandler.Collection)))
-	mux.Handle("/categories/", adminOnly(http.HandlerFunc(categoryHandler.Resource)))
+	mux.Handle("/categories", authHandler.Authenticate(http.HandlerFunc(categoryHandler.Collection)))
+	mux.Handle("/categories/", authHandler.Authenticate(http.HandlerFunc(categoryHandler.Resource)))
 
 	request := httptest.NewRequest(method, path, strings.NewReader(body))
 	if user != nil {

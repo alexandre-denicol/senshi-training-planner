@@ -59,33 +59,30 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", healthHandler)
 	authHandler.Register(mux)
+	authenticated := func(next http.Handler) http.Handler {
+		return authHandler.Authenticate(next)
+	}
 	adminOnly := func(next http.Handler) http.Handler {
 		return authHandler.Authenticate(auth.RequireAdmin(next))
 	}
 	mux.Handle("/professors", adminOnly(http.HandlerFunc(professorHandler.Collection)))
 	mux.Handle("/professors/", adminOnly(http.HandlerFunc(professorHandler.Resource)))
-	mux.Handle("/categories", adminOnly(http.HandlerFunc(categoryHandler.Collection)))
-	mux.Handle("/categories/", adminOnly(http.HandlerFunc(categoryHandler.Resource)))
-	mux.Handle("/blocks", adminOnly(http.HandlerFunc(blockHandler.Collection)))
-	mux.Handle("/blocks/", adminOnly(http.HandlerFunc(blockHandler.Resource)))
-	mux.Handle("/workouts", adminOnly(http.HandlerFunc(workoutHandler.Collection)))
-	mux.Handle("/workouts/", adminOnly(http.HandlerFunc(workoutHandler.Resource)))
-	mux.Handle("/schedule", authHandler.Authenticate(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet {
-			scheduleHandler.Collection(w, r)
-			return
-		}
-		auth.RequireAdmin(http.HandlerFunc(scheduleHandler.Collection)).ServeHTTP(w, r)
-	})))
-	mux.Handle("/schedule/", authHandler.Authenticate(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mux.Handle("/categories", authenticated(http.HandlerFunc(categoryHandler.Collection)))
+	mux.Handle("/categories/", authenticated(http.HandlerFunc(categoryHandler.Resource)))
+	mux.Handle("/blocks", authenticated(http.HandlerFunc(blockHandler.Collection)))
+	mux.Handle("/blocks/", authenticated(http.HandlerFunc(blockHandler.Resource)))
+	mux.Handle("/workouts", authenticated(http.HandlerFunc(workoutHandler.Collection)))
+	mux.Handle("/workouts/", authenticated(http.HandlerFunc(workoutHandler.Resource)))
+	mux.Handle("/schedule", authenticated(http.HandlerFunc(scheduleHandler.Collection)))
+	mux.Handle("/schedule/", authenticated(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if scheduleCompletePath(r.URL.Path) {
 			historyHandler.CompleteSchedule(w, r, scheduleCompleteID(r.URL.Path))
 			return
 		}
-		auth.RequireAdmin(http.HandlerFunc(scheduleHandler.Resource)).ServeHTTP(w, r)
+		scheduleHandler.Resource(w, r)
 	})))
-	mux.Handle("/history", authHandler.Authenticate(http.HandlerFunc(historyHandler.Collection)))
-	mux.Handle("/history/", authHandler.Authenticate(http.HandlerFunc(historyHandler.Resource)))
+	mux.Handle("/history", authenticated(http.HandlerFunc(historyHandler.Collection)))
+	mux.Handle("/history/", authenticated(http.HandlerFunc(historyHandler.Resource)))
 
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,
