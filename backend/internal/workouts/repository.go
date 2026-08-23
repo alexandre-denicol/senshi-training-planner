@@ -156,6 +156,9 @@ func (s *PostgresStore) SetWorkoutStatus(ctx context.Context, id string, active 
 
 func (s *PostgresStore) DeleteWorkout(ctx context.Context, id string) error {
 	commandTag, err := s.pool.Exec(ctx, `DELETE FROM workouts WHERE id = $1`, id)
+	if workoutInUseViolation(err) {
+		return ErrInUse
+	}
 	if err != nil {
 		return err
 	}
@@ -316,4 +319,9 @@ func workoutNameUniqueViolation(err error) bool {
 func blockForeignKeyViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "23503" && pgErr.ConstraintName == "workout_blocks_block_id_fkey"
+}
+
+func workoutInUseViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23503" && pgErr.ConstraintName == "schedule_entries_workout_id_fkey"
 }

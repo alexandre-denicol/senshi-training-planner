@@ -1,4 +1,4 @@
-package workouts
+package schedule
 
 import (
 	"errors"
@@ -30,15 +30,13 @@ func (h *Handler) Collection(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Resource(w http.ResponseWriter, r *http.Request) {
 	segments := resourceSegments(r.URL.Path)
 	if len(segments) == 0 {
-		httpapi.WriteError(w, http.StatusNotFound, "workout not found")
+		httpapi.WriteError(w, http.StatusNotFound, "schedule entry not found")
 		return
 	}
 
 	id := segments[0]
 	if len(segments) == 1 {
 		switch r.Method {
-		case http.MethodGet:
-			h.get(w, r, id)
 		case http.MethodPut:
 			h.update(w, r, id)
 		case http.MethodDelete:
@@ -49,31 +47,17 @@ func (h *Handler) Resource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(segments) == 2 && segments[1] == "status" {
-		if r.Method != http.MethodPatch {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			return
-		}
-		h.setStatus(w, r, id)
-		return
-	}
-
-	httpapi.WriteError(w, http.StatusNotFound, "workout not found")
+	httpapi.WriteError(w, http.StatusNotFound, "schedule entry not found")
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
-	workouts, err := h.service.List(r.Context())
+	entries, err := h.service.List(r.Context(), r.URL.Query().Get("from"), r.URL.Query().Get("to"))
 	if err != nil {
-		httpapi.WriteError(w, http.StatusInternalServerError, "internal server error")
+		writeEntryListResult(w, entries, err)
 		return
 	}
 
-	httpapi.WriteJSON(w, http.StatusOK, workouts)
-}
-
-func (h *Handler) get(w http.ResponseWriter, r *http.Request, id string) {
-	workout, err := h.service.Get(r.Context(), id)
-	writeWorkoutDetailResult(w, http.StatusOK, workout, err)
+	httpapi.WriteJSON(w, http.StatusOK, entries)
 }
 
 func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
@@ -83,8 +67,8 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	workout, err := h.service.Create(r.Context(), input)
-	writeWorkoutDetailResult(w, http.StatusCreated, workout, err)
+	entry, err := h.service.Create(r.Context(), input)
+	writeEntryResult(w, http.StatusCreated, entry, err)
 }
 
 func (h *Handler) update(w http.ResponseWriter, r *http.Request, id string) {
@@ -94,19 +78,8 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request, id string) {
 		return
 	}
 
-	workout, err := h.service.Update(r.Context(), id, input)
-	writeWorkoutDetailResult(w, http.StatusOK, workout, err)
-}
-
-func (h *Handler) setStatus(w http.ResponseWriter, r *http.Request, id string) {
-	var input StatusInput
-	if err := httpapi.ReadJSON(w, r, &input); err != nil {
-		httpapi.WriteError(w, http.StatusBadRequest, "invalid request")
-		return
-	}
-
-	workout, err := h.service.SetStatus(r.Context(), id, input)
-	writeWorkoutListResult(w, http.StatusOK, workout, err)
+	entry, err := h.service.Update(r.Context(), id, input)
+	writeEntryResult(w, http.StatusOK, entry, err)
 }
 
 func (h *Handler) delete(w http.ResponseWriter, r *http.Request, id string) {
@@ -114,33 +87,27 @@ func (h *Handler) delete(w http.ResponseWriter, r *http.Request, id string) {
 	writeEmptyResult(w, err)
 }
 
-func writeWorkoutDetailResult(w http.ResponseWriter, successStatus int, workout WorkoutDetail, err error) {
+func writeEntryListResult(w http.ResponseWriter, entries []Entry, err error) {
 	switch {
 	case err == nil:
-		httpapi.WriteJSON(w, successStatus, workout)
-	case errors.Is(err, ErrInvalidRequest), errors.Is(err, ErrInvalidBlocks):
+		httpapi.WriteJSON(w, http.StatusOK, entries)
+	case errors.Is(err, ErrInvalidRequest):
 		httpapi.WriteError(w, http.StatusBadRequest, "invalid request")
-	case errors.Is(err, ErrNameExists):
-		httpapi.WriteError(w, http.StatusConflict, "workout name already exists")
-	case errors.Is(err, ErrNotFound):
-		httpapi.WriteError(w, http.StatusNotFound, "workout not found")
-	case errors.Is(err, ErrInUse):
-		httpapi.WriteError(w, http.StatusConflict, "workout is in use")
 	default:
 		httpapi.WriteError(w, http.StatusInternalServerError, "internal server error")
 	}
 }
 
-func writeWorkoutListResult(w http.ResponseWriter, successStatus int, workout WorkoutListItem, err error) {
+func writeEntryResult(w http.ResponseWriter, successStatus int, entry Entry, err error) {
 	switch {
 	case err == nil:
-		httpapi.WriteJSON(w, successStatus, workout)
-	case errors.Is(err, ErrInvalidRequest):
+		httpapi.WriteJSON(w, successStatus, entry)
+	case errors.Is(err, ErrInvalidRequest), errors.Is(err, ErrInvalidWorkout):
 		httpapi.WriteError(w, http.StatusBadRequest, "invalid request")
+	case errors.Is(err, ErrDuplicate):
+		httpapi.WriteError(w, http.StatusConflict, "workout already scheduled for date")
 	case errors.Is(err, ErrNotFound):
-		httpapi.WriteError(w, http.StatusNotFound, "workout not found")
-	case errors.Is(err, ErrInUse):
-		httpapi.WriteError(w, http.StatusConflict, "workout is in use")
+		httpapi.WriteError(w, http.StatusNotFound, "schedule entry not found")
 	default:
 		httpapi.WriteError(w, http.StatusInternalServerError, "internal server error")
 	}
@@ -153,16 +120,14 @@ func writeEmptyResult(w http.ResponseWriter, err error) {
 	case errors.Is(err, ErrInvalidRequest):
 		httpapi.WriteError(w, http.StatusBadRequest, "invalid request")
 	case errors.Is(err, ErrNotFound):
-		httpapi.WriteError(w, http.StatusNotFound, "workout not found")
-	case errors.Is(err, ErrInUse):
-		httpapi.WriteError(w, http.StatusConflict, "workout is in use")
+		httpapi.WriteError(w, http.StatusNotFound, "schedule entry not found")
 	default:
 		httpapi.WriteError(w, http.StatusInternalServerError, "internal server error")
 	}
 }
 
 func resourceSegments(path string) []string {
-	resource := strings.TrimPrefix(path, "/workouts/")
+	resource := strings.TrimPrefix(path, "/schedule/")
 	resource = strings.Trim(resource, "/")
 	if resource == "" {
 		return nil

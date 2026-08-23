@@ -13,6 +13,7 @@ var (
 	ErrInvalidBlocks  = errors.New("invalid blocks")
 	ErrNameExists     = errors.New("workout name already exists")
 	ErrNotFound       = errors.New("workout not found")
+	ErrInUse          = errors.New("workout is in use")
 )
 
 type CategoryRef struct {
