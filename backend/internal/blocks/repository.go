@@ -141,6 +141,9 @@ func (s *PostgresStore) DeleteBlock(ctx context.Context, id string) error {
 	const query = `DELETE FROM blocks WHERE id = $1`
 
 	commandTag, err := s.pool.Exec(ctx, query, id)
+	if blockInUseViolation(err) {
+		return ErrInUse
+	}
 	if err != nil {
 		return err
 	}
@@ -192,4 +195,9 @@ func blockNameUniqueViolation(err error) bool {
 func categoryForeignKeyViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "23503" && pgErr.ConstraintName == "blocks_category_id_fkey"
+}
+
+func blockInUseViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23503" && pgErr.ConstraintName == "workout_blocks_block_id_fkey"
 }

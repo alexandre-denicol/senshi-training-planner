@@ -161,6 +161,10 @@ func TestServiceUpdateStatusDeleteAndNotFound(t *testing.T) {
 	if err := service.Delete(context.Background(), missingBlockID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("expected missing delete not found, got %v", err)
 	}
+	store.deleteErr = ErrInUse
+	if err := service.Delete(context.Background(), blockID); !errors.Is(err, ErrInUse) {
+		t.Fatalf("expected in-use delete error, got %v", err)
+	}
 	_, err = service.SetStatus(context.Background(), blockID, StatusInput{})
 	if !errors.Is(err, ErrInvalidRequest) {
 		t.Fatalf("expected missing active invalid request, got %v", err)
@@ -171,6 +175,7 @@ type fakeBlockStore struct {
 	created          []NewBlock
 	createErr        error
 	updateErr        error
+	deleteErr        error
 	updateCategoryID string
 	deletedID        string
 }
@@ -208,6 +213,9 @@ func (s *fakeBlockStore) SetBlockStatus(_ context.Context, id string, active boo
 func (s *fakeBlockStore) DeleteBlock(_ context.Context, id string) error {
 	if id == missingBlockID {
 		return ErrNotFound
+	}
+	if s.deleteErr != nil {
+		return s.deleteErr
 	}
 	s.deletedID = id
 	return nil

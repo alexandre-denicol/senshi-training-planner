@@ -1,0 +1,277 @@
+<section class="workouts-page" aria-labelledby="workouts-title">
+  <header class="page-header">
+    <div>
+      <h1 id="workouts-title">Treinos</h1>
+      <p>Monte e organize os treinos utilizando os blocos do catálogo.</p>
+    </div>
+
+    <button
+      pButton
+      type="button"
+      class="primary-action"
+      [disabled]="!hasActiveBlocks()"
+      (click)="openCreateDialog()"
+    >
+      <i class="pi pi-plus" aria-hidden="true"></i>
+      <span>Novo treino</span>
+    </button>
+  </header>
+
+  @if (successMessage()) {
+    <p class="feedback success" role="status">{{ successMessage() }}</p>
+  }
+
+  @if (errorMessage()) {
+    <p class="feedback error" role="alert">{{ errorMessage() }}</p>
+  }
+
+  @if (!loading() && !hasActiveBlocks()) {
+    <p class="feedback notice" role="status">Cadastre ou ative pelo menos um bloco antes de criar um treino.</p>
+  }
+
+  <div class="surface">
+    @if (loading()) {
+      <div class="loading-state" role="status" aria-label="Carregando treinos">
+        <span class="loading-indicator" aria-hidden="true"></span>
+      </div>
+    } @else if (!hasWorkouts()) {
+      <div class="empty-list">
+        <p>Nenhum treino cadastrado.</p>
+        <button pButton type="button" [disabled]="!hasActiveBlocks()" (click)="openCreateDialog()">
+          <i class="pi pi-plus" aria-hidden="true"></i>
+          <span>Novo treino</span>
+        </button>
+      </div>
+    } @else {
+      <table class="desktop-table">
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>Blocos</th>
+            <th>Status</th>
+            <th>Cadastro</th>
+            <th class="actions-heading">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (workout of workouts(); track workout.id) {
+            <tr>
+              <td>{{ workout.name }}</td>
+              <td>{{ formatBlockCount(workout) }}</td>
+              <td>
+                <span class="status-badge" [class.inactive]="!workout.active">{{ statusLabel(workout) }}</span>
+              </td>
+              <td>{{ formatDate(workout.createdAt) }}</td>
+              <td>
+                <div class="row-actions">
+                  <button
+                    pButton
+                    type="button"
+                    class="icon-action"
+                    aria-label="Editar treino"
+                    title="Editar"
+                    [disabled]="rowActionId() === workout.id"
+                    (click)="openEditDialog(workout)"
+                  >
+                    <i class="pi pi-pencil" aria-hidden="true"></i>
+                  </button>
+                  <button
+                    pButton
+                    type="button"
+                    class="icon-action"
+                    [attr.aria-label]="workout.active ? 'Desativar treino' : 'Ativar treino'"
+                    [title]="workout.active ? 'Desativar' : 'Ativar'"
+                    [disabled]="rowActionId() === workout.id"
+                    (click)="confirmStatus(workout)"
+                  >
+                    <i [class]="workout.active ? 'pi pi-ban' : 'pi pi-check-circle'" aria-hidden="true"></i>
+                  </button>
+                  <button
+                    pButton
+                    type="button"
+                    class="icon-action danger"
+                    aria-label="Excluir treino"
+                    title="Excluir"
+                    [disabled]="rowActionId() === workout.id"
+                    (click)="confirmDelete(workout)"
+                  >
+                    <i class="pi pi-trash" aria-hidden="true"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+
+      <div class="mobile-list">
+        @for (workout of workouts(); track workout.id) {
+          <article class="workout-card">
+            <div>
+              <h2>{{ workout.name }}</h2>
+              <p>{{ formatBlockCount(workout) }}</p>
+            </div>
+            <span class="status-badge" [class.inactive]="!workout.active">{{ statusLabel(workout) }}</span>
+            <dl>
+              <dt>Cadastro</dt>
+              <dd>{{ formatDate(workout.createdAt) }}</dd>
+            </dl>
+            <div class="card-actions">
+              <button pButton type="button" class="icon-action" aria-label="Editar treino" title="Editar" (click)="openEditDialog(workout)">
+                <i class="pi pi-pencil" aria-hidden="true"></i>
+              </button>
+              <button
+                pButton
+                type="button"
+                class="icon-action"
+                [attr.aria-label]="workout.active ? 'Desativar treino' : 'Ativar treino'"
+                [title]="workout.active ? 'Desativar' : 'Ativar'"
+                (click)="confirmStatus(workout)"
+              >
+                <i [class]="workout.active ? 'pi pi-ban' : 'pi pi-check-circle'" aria-hidden="true"></i>
+              </button>
+              <button pButton type="button" class="icon-action danger" aria-label="Excluir treino" title="Excluir" (click)="confirmDelete(workout)">
+                <i class="pi pi-trash" aria-hidden="true"></i>
+              </button>
+            </div>
+          </article>
+        }
+      </div>
+    }
+  </div>
+</section>
+
+<p-dialog
+  header="Novo treino"
+  [(visible)]="createDialogOpen"
+  [modal]="true"
+  [draggable]="false"
+  [resizable]="false"
+  styleClass="workout-dialog"
+  (onHide)="closeCreateDialog()"
+>
+  <form class="dialog-form" (ngSubmit)="createWorkout()">
+    <ng-container *ngTemplateOutlet="workoutEditor; context: { form: createForm }"></ng-container>
+
+    <footer class="dialog-actions">
+      <button pButton type="button" class="secondary-action" (click)="closeCreateDialog()" [disabled]="submitting()">
+        Cancelar
+      </button>
+      <button pButton type="submit" [disabled]="!formValid(createForm) || submitting()">
+        {{ submitting() ? 'Salvando...' : 'Salvar' }}
+      </button>
+    </footer>
+  </form>
+</p-dialog>
+
+<p-dialog
+  header="Editar treino"
+  [(visible)]="editDialogOpen"
+  [modal]="true"
+  [draggable]="false"
+  [resizable]="false"
+  styleClass="workout-dialog"
+  (onHide)="closeEditDialog()"
+>
+  @if (detailLoading()) {
+    <div class="loading-state compact" role="status" aria-label="Carregando treino">
+      <span class="loading-indicator" aria-hidden="true"></span>
+    </div>
+  } @else {
+    <form class="dialog-form" (ngSubmit)="updateWorkout()">
+      <ng-container *ngTemplateOutlet="workoutEditor; context: { form: editForm }"></ng-container>
+
+      <footer class="dialog-actions">
+        <button pButton type="button" class="secondary-action" (click)="closeEditDialog()" [disabled]="submitting()">
+          Cancelar
+        </button>
+        <button pButton type="submit" [disabled]="!formValid(editForm) || submitting()">
+          {{ submitting() ? 'Salvando...' : 'Salvar' }}
+        </button>
+      </footer>
+    </form>
+  }
+</p-dialog>
+
+<ng-template #workoutEditor let-form="form">
+  <label>
+    <span>Nome</span>
+    <input
+      pInputText
+      type="text"
+      name="workout-name"
+      autocomplete="off"
+      required
+      [(ngModel)]="form.name"
+    />
+  </label>
+
+  <div class="block-picker">
+    <label>
+      <span>Bloco</span>
+      <select name="workout-block" [(ngModel)]="form.selectedBlockId">
+        <option value="">Selecione um bloco ativo</option>
+        @for (block of availableBlocks(form); track block.id) {
+          <option [value]="block.id">{{ block.name }} - {{ block.category.name }}</option>
+        }
+      </select>
+    </label>
+    <button pButton type="button" class="secondary-action add-block-action" [disabled]="!form.selectedBlockId" (click)="addSelectedBlock(form)">
+      <i class="pi pi-plus" aria-hidden="true"></i>
+      <span>Adicionar</span>
+    </button>
+  </div>
+
+  <div class="selected-blocks" aria-label="Blocos selecionados">
+    @if (form.blocks.length === 0) {
+      <p class="form-hint">Selecione pelo menos um bloco.</p>
+    } @else {
+      @for (block of form.blocks; track block.id; let index = $index; let first = $first; let last = $last) {
+        <article class="selected-block">
+          <span class="position">{{ index + 1 }}</span>
+          <div>
+            <h3>{{ block.name }}</h3>
+            <p>{{ block.category.name }}</p>
+            @if (!block.active) {
+              <span class="inline-badge">Inativo</span>
+            }
+          </div>
+          <div class="selected-actions">
+            <button pButton type="button" class="icon-action" aria-label="Mover bloco para cima" title="Mover para cima" [disabled]="first" (click)="moveBlockUp(form, index)">
+              <i class="pi pi-arrow-up" aria-hidden="true"></i>
+            </button>
+            <button pButton type="button" class="icon-action" aria-label="Mover bloco para baixo" title="Mover para baixo" [disabled]="last" (click)="moveBlockDown(form, index)">
+              <i class="pi pi-arrow-down" aria-hidden="true"></i>
+            </button>
+            <button pButton type="button" class="icon-action danger" aria-label="Remover bloco" title="Remover" (click)="removeBlock(form, index)">
+              <i class="pi pi-times" aria-hidden="true"></i>
+            </button>
+          </div>
+        </article>
+      }
+    }
+  </div>
+</ng-template>
+
+<p-dialog
+  [header]="confirmationTitle()"
+  [visible]="confirmation() !== null"
+  [modal]="true"
+  [draggable]="false"
+  [resizable]="false"
+  styleClass="workout-dialog"
+  (onHide)="cancelConfirmation()"
+>
+  <div class="confirmation-body">
+    <p>{{ confirmationText() }}</p>
+  </div>
+
+  <footer class="dialog-actions">
+    <button pButton type="button" class="secondary-action" (click)="cancelConfirmation()" [disabled]="submitting()">
+      Cancelar
+    </button>
+    <button pButton type="button" [class.danger-action]="confirmation()?.kind === 'delete'" (click)="applyConfirmation()" [disabled]="submitting()">
+      {{ submitting() ? 'Processando...' : 'Confirmar' }}
+    </button>
+  </footer>
+</p-dialog>

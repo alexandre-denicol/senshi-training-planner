@@ -1,0 +1,9 @@
+cd /home/alexandre/projetos/senshi-training-planner/backend
+
+set -a
+source ../.env
+set +a
+
+export PORT=18080
+
+go run ./cmd/server

@@ -121,6 +121,20 @@ describe('BlocksPage', () => {
     expect(fixture.nativeElement.textContent).toContain('Nenhum bloco cadastrado.');
   });
 
+  it('shows safe message when block delete is blocked by workouts', async () => {
+    const original = block({ id: 'block-1', name: 'Base' });
+    const blockApi = new FakeBlockApi([original]);
+    blockApi.deleteError = new HttpErrorResponse({ status: 409, statusText: 'Conflict' });
+    const { fixture, component } = await renderPage([original], [category()], blockApi);
+
+    component.confirmDelete(original);
+    await component.applyConfirmation();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Este bloco está sendo utilizado por um ou mais treinos e não pode ser excluído.');
+    expect(fixture.nativeElement.textContent).not.toContain('workout_blocks_block_id_fkey');
+  });
+
   it('clears form state after dialog closes', async () => {
     const original = block({ id: 'block-1', name: 'Base' });
     const { component } = await renderPage([original], [category()]);
@@ -191,6 +205,7 @@ class FakeBlockApi {
   statusChanges: Array<{ id: string; active: boolean }> = [];
   deleted: string[] = [];
   createError: unknown = null;
+  deleteError: unknown = null;
 
   constructor(private blocks: Block[]) {}
 
@@ -236,6 +251,9 @@ class FakeBlockApi {
 
   async delete(id: string): Promise<void> {
     this.deleted.push(id);
+    if (this.deleteError) {
+      throw this.deleteError;
+    }
     this.blocks = this.blocks.filter((item) => item.id !== id);
   }
 }
