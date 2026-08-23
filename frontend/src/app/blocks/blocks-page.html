@@ -1,0 +1,269 @@
+<section class="blocks-page" aria-labelledby="blocks-title">
+  <header class="page-header">
+    <div>
+      <h1 id="blocks-title">Blocos</h1>
+      <p>Organize os blocos utilizados na montagem dos treinos.</p>
+    </div>
+
+    <button
+      pButton
+      type="button"
+      class="primary-action"
+      [disabled]="!hasActiveCategories()"
+      (click)="openCreateDialog()"
+    >
+      <i class="pi pi-plus" aria-hidden="true"></i>
+      <span>Novo bloco</span>
+    </button>
+  </header>
+
+  @if (successMessage()) {
+    <p class="feedback success" role="status">{{ successMessage() }}</p>
+  }
+
+  @if (errorMessage()) {
+    <p class="feedback error" role="alert">{{ errorMessage() }}</p>
+  }
+
+  @if (!loading() && !hasActiveCategories()) {
+    <p class="feedback notice" role="status">Cadastre ou ative uma categoria antes de criar blocos.</p>
+  }
+
+  <div class="surface">
+    @if (loading()) {
+      <div class="loading-state" role="status" aria-label="Carregando blocos">
+        <span class="loading-indicator" aria-hidden="true"></span>
+      </div>
+    } @else if (!hasBlocks()) {
+      <div class="empty-list">
+        <p>Nenhum bloco cadastrado.</p>
+        <button pButton type="button" [disabled]="!hasActiveCategories()" (click)="openCreateDialog()">
+          <i class="pi pi-plus" aria-hidden="true"></i>
+          <span>Novo bloco</span>
+        </button>
+      </div>
+    } @else {
+      <table class="desktop-table">
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>Categoria</th>
+            <th>Status</th>
+            <th>Cadastro</th>
+            <th class="actions-heading">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (block of blocks(); track block.id) {
+            <tr>
+              <td>{{ block.name }}</td>
+              <td>{{ block.category.name }}</td>
+              <td>
+                <span class="status-badge" [class.inactive]="!block.active">{{ statusLabel(block) }}</span>
+              </td>
+              <td>{{ formatDate(block.createdAt) }}</td>
+              <td>
+                <div class="row-actions">
+                  <button
+                    pButton
+                    type="button"
+                    class="icon-action"
+                    aria-label="Editar bloco"
+                    title="Editar"
+                    [disabled]="rowActionId() === block.id"
+                    (click)="openEditDialog(block)"
+                  >
+                    <i class="pi pi-pencil" aria-hidden="true"></i>
+                  </button>
+                  <button
+                    pButton
+                    type="button"
+                    class="icon-action"
+                    [attr.aria-label]="block.active ? 'Desativar bloco' : 'Ativar bloco'"
+                    [title]="block.active ? 'Desativar' : 'Ativar'"
+                    [disabled]="rowActionId() === block.id"
+                    (click)="confirmStatus(block)"
+                  >
+                    <i [class]="block.active ? 'pi pi-ban' : 'pi pi-check-circle'" aria-hidden="true"></i>
+                  </button>
+                  <button
+                    pButton
+                    type="button"
+                    class="icon-action danger"
+                    aria-label="Excluir bloco"
+                    title="Excluir"
+                    [disabled]="rowActionId() === block.id"
+                    (click)="confirmDelete(block)"
+                  >
+                    <i class="pi pi-trash" aria-hidden="true"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+
+      <div class="mobile-list">
+        @for (block of blocks(); track block.id) {
+          <article class="block-card">
+            <div>
+              <h2>{{ block.name }}</h2>
+              <p>{{ block.category.name }}</p>
+            </div>
+            <span class="status-badge" [class.inactive]="!block.active">{{ statusLabel(block) }}</span>
+            <dl>
+              <dt>Cadastro</dt>
+              <dd>{{ formatDate(block.createdAt) }}</dd>
+            </dl>
+            <div class="card-actions">
+              <button
+                pButton
+                type="button"
+                class="icon-action"
+                aria-label="Editar bloco"
+                title="Editar"
+                (click)="openEditDialog(block)"
+              >
+                <i class="pi pi-pencil" aria-hidden="true"></i>
+              </button>
+              <button
+                pButton
+                type="button"
+                class="icon-action"
+                [attr.aria-label]="block.active ? 'Desativar bloco' : 'Ativar bloco'"
+                [title]="block.active ? 'Desativar' : 'Ativar'"
+                (click)="confirmStatus(block)"
+              >
+                <i [class]="block.active ? 'pi pi-ban' : 'pi pi-check-circle'" aria-hidden="true"></i>
+              </button>
+              <button
+                pButton
+                type="button"
+                class="icon-action danger"
+                aria-label="Excluir bloco"
+                title="Excluir"
+                (click)="confirmDelete(block)"
+              >
+                <i class="pi pi-trash" aria-hidden="true"></i>
+              </button>
+            </div>
+          </article>
+        }
+      </div>
+    }
+  </div>
+</section>
+
+<p-dialog
+  header="Novo bloco"
+  [(visible)]="createDialogOpen"
+  [modal]="true"
+  [draggable]="false"
+  [resizable]="false"
+  styleClass="block-dialog"
+  (onHide)="closeCreateDialog()"
+>
+  <form class="dialog-form" (ngSubmit)="createBlock()">
+    <label>
+      <span>Nome</span>
+      <input
+        pInputText
+        type="text"
+        name="create-block-name"
+        autocomplete="off"
+        required
+        [(ngModel)]="createForm.name"
+      />
+    </label>
+
+    <label>
+      <span>Categoria</span>
+      <select name="create-block-category" required [(ngModel)]="createForm.categoryId">
+        <option value="">Selecione uma categoria</option>
+        @for (category of activeCategories(); track category.id) {
+          <option [value]="category.id">{{ category.name }}</option>
+        }
+      </select>
+    </label>
+
+    <footer class="dialog-actions">
+      <button pButton type="button" class="secondary-action" (click)="closeCreateDialog()" [disabled]="submitting()">
+        Cancelar
+      </button>
+      <button pButton type="submit" [disabled]="!formValid(createForm) || submitting()">
+        {{ submitting() ? 'Salvando...' : 'Salvar' }}
+      </button>
+    </footer>
+  </form>
+</p-dialog>
+
+<p-dialog
+  header="Editar bloco"
+  [(visible)]="editDialogOpen"
+  [modal]="true"
+  [draggable]="false"
+  [resizable]="false"
+  styleClass="block-dialog"
+  (onHide)="closeEditDialog()"
+>
+  <form class="dialog-form" (ngSubmit)="updateBlock()">
+    <label>
+      <span>Nome</span>
+      <input
+        pInputText
+        type="text"
+        name="edit-block-name"
+        autocomplete="off"
+        required
+        [(ngModel)]="editForm.name"
+      />
+    </label>
+
+    <label>
+      <span>Categoria</span>
+      <select name="edit-block-category" required [(ngModel)]="editForm.categoryId">
+        <option value="">Selecione uma categoria ativa</option>
+        @for (category of activeCategories(); track category.id) {
+          <option [value]="category.id">{{ category.name }}</option>
+        }
+      </select>
+    </label>
+
+    @if (selectedBlock && !categoryIsActive(selectedBlock.category.id)) {
+      <p class="form-hint">Selecione uma categoria ativa para salvar alterações.</p>
+    }
+
+    <footer class="dialog-actions">
+      <button pButton type="button" class="secondary-action" (click)="closeEditDialog()" [disabled]="submitting()">
+        Cancelar
+      </button>
+      <button pButton type="submit" [disabled]="!formValid(editForm) || submitting()">
+        {{ submitting() ? 'Salvando...' : 'Salvar' }}
+      </button>
+    </footer>
+  </form>
+</p-dialog>
+
+<p-dialog
+  [header]="confirmationTitle()"
+  [visible]="confirmation() !== null"
+  [modal]="true"
+  [draggable]="false"
+  [resizable]="false"
+  styleClass="block-dialog"
+  (onHide)="cancelConfirmation()"
+>
+  <div class="confirmation-body">
+    <p>{{ confirmationText() }}</p>
+  </div>
+
+  <footer class="dialog-actions">
+    <button pButton type="button" class="secondary-action" (click)="cancelConfirmation()" [disabled]="submitting()">
+      Cancelar
+    </button>
+    <button pButton type="button" [class.danger-action]="confirmation()?.kind === 'delete'" (click)="applyConfirmation()" [disabled]="submitting()">
+      {{ submitting() ? 'Processando...' : 'Confirmar' }}
+    </button>
+  </footer>
+</p-dialog>

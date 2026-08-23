@@ -92,6 +92,20 @@ describe('CategoriesPage', () => {
     expect(fixture.nativeElement.textContent).toContain('Nenhuma categoria cadastrada.');
   });
 
+  it('shows safe message when category delete is blocked by blocks', async () => {
+    const original = category({ id: 'cat-1', name: 'Técnica' });
+    const api = new FakeCategoryApi([original]);
+    api.deleteError = new HttpErrorResponse({ status: 409, statusText: 'Conflict' });
+    const { fixture, component } = await renderPage([original], api);
+
+    component.confirmDelete(original);
+    await component.applyConfirmation();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Esta categoria está sendo utilizada por um ou mais blocos e não pode ser excluída.');
+    expect(fixture.nativeElement.textContent).not.toContain('blocks_category_id_fkey');
+  });
+
   it('clears form state after dialog closes', async () => {
     const original = category({ id: 'cat-1', name: 'Técnica' });
     const { component } = await renderPage([original]);
@@ -145,6 +159,7 @@ class FakeCategoryApi {
   statusChanges: Array<{ id: string; active: boolean }> = [];
   deleted: string[] = [];
   createError: unknown = null;
+  deleteError: unknown = null;
 
   constructor(private categories: Category[]) {}
 
@@ -185,6 +200,9 @@ class FakeCategoryApi {
 
   async delete(id: string): Promise<void> {
     this.deleted.push(id);
+    if (this.deleteError) {
+      throw this.deleteError;
+    }
     this.categories = this.categories.filter((item) => item.id !== id);
   }
 }

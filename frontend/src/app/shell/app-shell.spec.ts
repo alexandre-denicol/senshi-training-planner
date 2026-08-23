@@ -25,6 +25,7 @@ describe('AppShell', () => {
 
     expect(fixture.nativeElement.textContent).toContain('Professores');
     expect(fixture.nativeElement.textContent).toContain('Categorias');
+    expect(fixture.nativeElement.textContent).toContain('Blocos');
   });
 
   it('does not show management navigation for PROFESSOR', async () => {
@@ -32,6 +33,7 @@ describe('AppShell', () => {
 
     expect(fixture.nativeElement.textContent).not.toContain('Professores');
     expect(fixture.nativeElement.textContent).not.toContain('Categorias');
+    expect(fixture.nativeElement.textContent).not.toContain('Blocos');
   });
 });
 
