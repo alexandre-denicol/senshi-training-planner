@@ -9,7 +9,6 @@
       pButton
       type="button"
       class="primary-action"
-      [disabled]="!hasActiveBlocks()"
       (click)="openCreateDialog()"
     >
       <i class="pi pi-plus" aria-hidden="true"></i>
@@ -25,10 +24,6 @@
     <p class="feedback error" role="alert">{{ errorMessage() }}</p>
   }
 
-  @if (!loading() && !hasActiveBlocks()) {
-    <p class="feedback notice" role="status">Cadastre ou ative pelo menos um bloco antes de criar um treino.</p>
-  }
-
   <div class="surface">
     @if (loading()) {
       <div class="loading-state" role="status" aria-label="Carregando treinos">
@@ -37,7 +32,7 @@
     } @else if (!hasWorkouts()) {
       <div class="empty-list">
         <p>Nenhum treino cadastrado.</p>
-        <button pButton type="button" [disabled]="!hasActiveBlocks()" (click)="openCreateDialog()">
+        <button pButton type="button" (click)="openCreateDialog()">
           <i class="pi pi-plus" aria-hidden="true"></i>
           <span>Novo treino</span>
         </button>
@@ -206,25 +201,36 @@
     />
   </label>
 
-  <div class="block-picker">
-    <label>
-      <span>Bloco</span>
-      <select name="workout-block" [(ngModel)]="form.selectedBlockId">
-        <option value="">Selecione um bloco ativo</option>
-        @for (block of availableBlocks(form); track block.id) {
-          <option [value]="block.id">{{ block.name }} - {{ block.category.name }}</option>
-        }
-      </select>
-    </label>
-    <button pButton type="button" class="secondary-action add-block-action" [disabled]="!form.selectedBlockId" (click)="addSelectedBlock(form)">
-      <i class="pi pi-plus" aria-hidden="true"></i>
-      <span>Adicionar</span>
-    </button>
-  </div>
+  @if (builderErrorMessage()) {
+    <p class="feedback error" role="alert">{{ builderErrorMessage() }}</p>
+  }
+
+  <section class="builder-section" aria-label="Blocos do treino">
+    <div class="builder-heading">
+      <div>
+        <h2>Blocos do treino</h2>
+        <p>A ordem abaixo será usada na execução do treino.</p>
+      </div>
+      <button pButton type="button" class="secondary-action add-block-action" (click)="openAddBlockDialog(form)">
+        <i class="pi pi-plus" aria-hidden="true"></i>
+        <span>Adicionar bloco</span>
+      </button>
+    </div>
+
+    @if (!hasActiveBlocks()) {
+      <div class="builder-empty">
+        <p>Nenhum bloco disponível ainda.</p>
+        <button pButton type="button" class="secondary-action" (click)="openAddBlockDialog(form)">
+          <i class="pi pi-plus" aria-hidden="true"></i>
+          <span>Criar primeiro bloco</span>
+        </button>
+      </div>
+    }
+  </section>
 
   <div class="selected-blocks" aria-label="Blocos selecionados">
     @if (form.blocks.length === 0) {
-      <p class="form-hint">Selecione pelo menos um bloco.</p>
+      <p class="form-hint">Adicione pelo menos um bloco.</p>
     } @else {
       @for (block of form.blocks; track block.id; let index = $index; let first = $first; let last = $last) {
         <article class="selected-block">
@@ -252,6 +258,223 @@
     }
   </div>
 </ng-template>
+
+<p-dialog
+  header="Adicionar bloco"
+  [(visible)]="addBlockDialogOpen"
+  [modal]="true"
+  [draggable]="false"
+  [resizable]="false"
+  styleClass="workout-dialog builder-dialog"
+  (onHide)="closeAddBlockDialog()"
+>
+  @if (addBlockFeedback()) {
+    <p class="feedback success" role="status">{{ addBlockFeedback() }}</p>
+  }
+
+  @if (addBlockErrorMessage()) {
+    <p class="feedback error" role="alert">{{ addBlockErrorMessage() }}</p>
+  }
+
+  @if (addBlockMode === 'select') {
+    <div class="dialog-form">
+      <div class="builder-heading compact">
+        <div>
+          <h2>Blocos disponíveis</h2>
+          <p>Escolha um bloco ativo para incluir no treino.</p>
+        </div>
+        <button pButton type="button" class="secondary-action" (click)="showCreateBlock()">
+          <i class="pi pi-plus" aria-hidden="true"></i>
+          <span>Criar novo bloco</span>
+        </button>
+      </div>
+
+      @if (hasActiveBlocks()) {
+        <label>
+          <span>Buscar</span>
+          <input
+            pInputText
+            type="search"
+            name="block-search"
+            autocomplete="off"
+            [(ngModel)]="blockSearch"
+          />
+        </label>
+      }
+
+      @if (filteredAvailableBlocks().length === 0) {
+        <div class="builder-empty">
+          <p>{{ hasActiveBlocks() ? 'Nenhum bloco encontrado.' : 'Nenhum bloco disponível ainda.' }}</p>
+          <button pButton type="button" class="secondary-action" (click)="showCreateBlock()">
+            <i class="pi pi-plus" aria-hidden="true"></i>
+            <span>{{ hasActiveBlocks() ? 'Criar novo bloco' : 'Criar primeiro bloco' }}</span>
+          </button>
+        </div>
+      } @else {
+        <div class="block-option-list" aria-label="Blocos disponíveis">
+          @for (block of filteredAvailableBlocks(); track block.id) {
+            <article class="block-option">
+              <div>
+                <h3>{{ block.name }}</h3>
+                <p>{{ block.category.name }}</p>
+              </div>
+              <button pButton type="button" class="secondary-action" (click)="addExistingBlock(block)">
+                <i class="pi pi-plus" aria-hidden="true"></i>
+                <span>Adicionar</span>
+              </button>
+            </article>
+          }
+        </div>
+      }
+
+      <footer class="dialog-actions">
+        <button pButton type="button" class="secondary-action" (click)="closeAddBlockDialog()">Concluir</button>
+      </footer>
+    </div>
+  } @else {
+    <form class="dialog-form" (ngSubmit)="createBlockInBuilder()">
+      <div class="builder-heading compact">
+        <div>
+          <h2>Criar novo bloco</h2>
+          <p>O bloco criado será adicionado ao treino atual.</p>
+        </div>
+        <button pButton type="button" class="secondary-action" (click)="showBlockSelection()" [disabled]="submitting()">
+          <i class="pi pi-arrow-left" aria-hidden="true"></i>
+          <span>Voltar</span>
+        </button>
+      </div>
+
+      <label>
+        <span>Nome</span>
+        <input
+          pInputText
+          type="text"
+          name="context-block-name"
+          autocomplete="off"
+          required
+          [(ngModel)]="blockCreateForm.name"
+        />
+      </label>
+
+      <div class="category-picker">
+        @if (hasActiveCategories()) {
+          <label>
+            <span>Categoria</span>
+            <select name="context-block-category" required [(ngModel)]="blockCreateForm.categoryId">
+              <option value="">Selecione uma categoria ativa</option>
+              @for (category of activeCategories(); track category.id) {
+                <option [value]="category.id">{{ category.name }}</option>
+              }
+            </select>
+          </label>
+          <button pButton type="button" class="secondary-action" (click)="openCategoryDialog()" [disabled]="submitting()">
+            <i class="pi pi-plus" aria-hidden="true"></i>
+            <span>Nova categoria</span>
+          </button>
+        } @else {
+          <div class="builder-empty inline">
+            <p>Nenhuma categoria disponível.</p>
+            <button pButton type="button" class="secondary-action" (click)="openCategoryDialog()" [disabled]="submitting()">
+              <i class="pi pi-plus" aria-hidden="true"></i>
+              <span>Criar categoria</span>
+            </button>
+          </div>
+        }
+      </div>
+
+      <footer class="dialog-actions">
+        <button pButton type="button" class="secondary-action" (click)="showBlockSelection()" [disabled]="submitting()">
+          Cancelar
+        </button>
+        <button pButton type="submit" [disabled]="!blockFormValid() || submitting()">
+          {{ submitting() ? 'Salvando...' : 'Criar e adicionar' }}
+        </button>
+      </footer>
+    </form>
+  }
+</p-dialog>
+
+<p-dialog
+  header="Nova categoria"
+  [(visible)]="categoryDialogOpen"
+  [modal]="true"
+  [draggable]="false"
+  [resizable]="false"
+  styleClass="workout-dialog nested-dialog"
+  (onHide)="closeCategoryDialog()"
+>
+  <form class="dialog-form" (ngSubmit)="createCategoryInBuilder()">
+    @if (categoryErrorMessage()) {
+      <p class="feedback error" role="alert">{{ categoryErrorMessage() }}</p>
+    }
+
+    <label>
+      <span>Nome</span>
+      <input
+        pInputText
+        type="text"
+        name="context-category-name"
+        autocomplete="off"
+        required
+        [(ngModel)]="categoryCreateForm.name"
+      />
+    </label>
+
+    <footer class="dialog-actions">
+      <button pButton type="button" class="secondary-action" (click)="closeCategoryDialog()" [disabled]="submitting()">
+        Cancelar
+      </button>
+      <button pButton type="submit" [disabled]="!categoryFormValid() || submitting()">
+        {{ submitting() ? 'Salvando...' : 'Criar categoria' }}
+      </button>
+    </footer>
+  </form>
+</p-dialog>
+
+<p-dialog
+  header="Treino criado com sucesso"
+  [(visible)]="postSaveDialogOpen"
+  [modal]="true"
+  [draggable]="false"
+  [resizable]="false"
+  styleClass="workout-dialog nested-dialog"
+  (onHide)="closePostSaveDialog()"
+>
+  <form class="dialog-form" (ngSubmit)="scheduleCreatedWorkout()">
+    @if (createdWorkout; as workout) {
+      <div class="post-save-summary">
+        <h2>{{ workout.name }}</h2>
+        <p>Você pode agendar este treino agora ou concluir.</p>
+      </div>
+    }
+
+    @if (scheduleErrorMessage()) {
+      <p class="feedback error" role="alert">{{ scheduleErrorMessage() }}</p>
+    }
+
+    <label>
+      <span>Data</span>
+      <input
+        pInputText
+        type="date"
+        name="created-workout-date"
+        autocomplete="off"
+        required
+        [(ngModel)]="scheduleForm.scheduledDate"
+      />
+    </label>
+
+    <footer class="dialog-actions">
+      <button pButton type="button" class="secondary-action" (click)="closePostSaveDialog()" [disabled]="submitting()">
+        Concluir
+      </button>
+      <button pButton type="submit" [disabled]="scheduleForm.scheduledDate === '' || submitting()">
+        <i class="pi pi-calendar-plus" aria-hidden="true"></i>
+        <span>{{ submitting() ? 'Agendando...' : 'Agendar este treino' }}</span>
+      </button>
+    </footer>
+  </form>
+</p-dialog>
 
 <p-dialog
   [header]="confirmationTitle()"

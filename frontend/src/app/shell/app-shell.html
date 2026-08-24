@@ -1,13 +1,16 @@
 <div class="admin-shell">
+  <div class="shell-background" aria-hidden="true"></div>
   <aside class="sidebar" aria-label="Navegação principal">
     <div class="sidebar-brand">
-      <span class="brand-mark">S</span>
-      <span>Senshi</span>
+      <span>
+        <strong><span class="brand-kanji">戦士</span> Senshi</strong>
+        <small>Kyokushin World Union</small>
+      </span>
     </div>
     <nav>
       @for (item of visibleNavItems(); track item.label) {
         @if (item.path) {
-          <a class="nav-item" [routerLink]="item.path">
+          <a class="nav-item" [routerLink]="item.path" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
             <i [class]="item.icon" aria-hidden="true"></i>
             <span>{{ item.label }}</span>
           </a>
@@ -19,6 +22,9 @@
         }
       }
     </nav>
+    <div class="sidebar-kwu-logo" aria-hidden="true">
+      <img src="/assets/kwu.jpg" alt="" />
+    </div>
   </aside>
 
   @if (drawerOpen()) {
@@ -32,13 +38,15 @@
 
   <aside class="mobile-drawer" [class.open]="drawerOpen()" aria-label="Navegação principal">
     <div class="sidebar-brand">
-      <span class="brand-mark">S</span>
-      <span>Senshi</span>
+      <span>
+        <strong><span class="brand-kanji">戦士</span> Senshi</strong>
+        <small>Kyokushin World Union</small>
+      </span>
     </div>
     <nav>
       @for (item of visibleNavItems(); track item.label) {
         @if (item.path) {
-          <a class="nav-item" [routerLink]="item.path" (click)="closeDrawer()">
+          <a class="nav-item" [routerLink]="item.path" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" (click)="closeDrawer()">
             <i [class]="item.icon" aria-hidden="true"></i>
             <span>{{ item.label }}</span>
           </a>
@@ -65,6 +73,9 @@
       </button>
 
       <div class="account-area">
+        <span class="notification-dot" aria-hidden="true">
+          <i class="pi pi-bell"></i>
+        </span>
         <div class="user-summary">
           <span class="user-name">{{ user().name }}</span>
           <span class="user-role">{{ user().role === 'ADMIN' ? 'Admin' : 'Professor' }}</span>

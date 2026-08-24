@@ -14,7 +14,7 @@
 
 h1 {
   color: #fff;
-  font-size: clamp(1.7rem, 3vw, 2.25rem);
+  font-size: clamp(1.9rem, 3vw, 2.7rem);
   line-height: 1.1;
   margin: 0;
 }
@@ -27,9 +27,9 @@ h1 {
 .primary-action,
 .empty-list button {
   align-items: center;
-  background: #14b8a6;
-  border-color: #14b8a6;
-  color: #04110f;
+  background: #2563eb;
+  border-color: #3b82f6;
+  color: #ffffff;
   display: inline-flex;
   flex: 0 0 auto;
   font-weight: 750;
@@ -46,8 +46,9 @@ h1 {
 
 .period-bar {
   align-items: center;
-  background: #171a1f;
-  border: 1px solid #2a3039;
+  background: linear-gradient(180deg, rgba(8, 22, 46, 0.88), rgba(4, 13, 29, 0.88));
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 10px;
   display: flex;
   gap: 0.65rem;
   padding: 0.65rem;
@@ -63,8 +64,9 @@ h1 {
 }
 
 .surface {
-  background: #171a1f;
-  border: 1px solid #2a3039;
+  background: linear-gradient(180deg, rgba(8, 22, 46, 0.88), rgba(4, 13, 29, 0.88));
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 10px;
   overflow: hidden;
 }
 
@@ -113,7 +115,7 @@ h1 {
 }
 
 .date-group {
-  border-bottom: 1px solid #2a3039;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
   display: grid;
 }
 
@@ -123,8 +125,8 @@ h1 {
 
 .date-group > header {
   align-items: baseline;
-  background: #1b1f26;
-  border-bottom: 1px solid #303743;
+  background: rgba(3, 10, 24, 0.46);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
   display: flex;
   gap: 0.75rem;
   justify-content: space-between;
@@ -148,15 +150,27 @@ h1 {
 
 .entry-card {
   align-items: center;
-  border-bottom: 1px solid #2a3039;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
   display: grid;
   gap: 1rem;
   grid-template-columns: 1fr auto;
-  padding: 1rem;
+  padding: 1.05rem 1.2rem;
 }
 
 .entry-card:last-child {
   border-bottom: 0;
+}
+
+.entry-main {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.entry-title-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
 }
 
 .entry-card h3 {
@@ -173,8 +187,8 @@ h1 {
 
 .status-badge,
 .inline-badge {
-  background: #232832;
-  border: 1px solid #3a4350;
+  background: rgba(15, 23, 42, 0.78);
+  border: 1px solid rgba(148, 163, 184, 0.22);
   border-radius: 999px;
   color: #cbd5e1;
   display: inline-flex;
@@ -186,10 +200,16 @@ h1 {
 }
 
 .status-badge {
-  background: rgba(20, 184, 166, 0.12);
-  border-color: rgba(94, 234, 212, 0.34);
-  color: #9ff5e8;
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.4);
+  color: #86efac;
   margin-right: 0.35rem;
+}
+
+.status-badge.scheduled {
+  background: rgba(37, 99, 235, 0.14);
+  border-color: rgba(96, 165, 250, 0.38);
+  color: #bfdbfe;
 }
 
 .loading-indicator {
@@ -209,8 +229,8 @@ h1 {
 
 .icon-action {
   align-items: center;
-  background: #20242b;
-  border-color: #343a45;
+  background: rgba(7, 19, 42, 0.9);
+  border-color: rgba(59, 130, 246, 0.28);
   color: #dbe5f3;
   display: inline-flex;
   height: 2.35rem;
@@ -221,18 +241,18 @@ h1 {
 
 .complete-action {
   align-items: center;
-  background: #20242b;
-  border-color: #343a45;
-  color: #9ff5e8;
+  background: rgba(34, 197, 94, 0.14);
+  border-color: rgba(34, 197, 94, 0.42);
+  color: #bbf7d0;
   display: inline-flex;
   gap: 0.45rem;
-  min-height: 2.35rem;
+  min-height: 2.5rem;
 }
 
 .detail-action {
   align-items: center;
-  background: #20242b;
-  border-color: #343a45;
+  background: rgba(7, 19, 42, 0.9);
+  border-color: rgba(59, 130, 246, 0.28);
   color: #dbe5f3;
   display: inline-flex;
   gap: 0.45rem;
@@ -283,8 +303,8 @@ h1 {
 }
 
 .secondary-action {
-  background: #20242b;
-  border-color: #343a45;
+  background: rgba(7, 19, 42, 0.9);
+  border-color: rgba(59, 130, 246, 0.36);
   color: #e2e8f0;
 }
 
@@ -304,8 +324,9 @@ h1 {
 }
 
 .completion-summary {
-  background: #111418;
-  border: 1px solid #2a3039;
+  background: rgba(7, 19, 42, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 8px;
   display: grid;
   gap: 0.2rem;
   padding: 0.8rem;
@@ -366,8 +387,9 @@ h1 {
 
 .workout-blocks li {
   align-items: start;
-  background: #111418;
-  border: 1px solid #2a3039;
+  background: rgba(3, 10, 24, 0.86);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 8px;
   display: grid;
   gap: 0.75rem;
   grid-template-columns: auto 1fr;
@@ -377,9 +399,10 @@ h1 {
 
 .block-position {
   align-items: center;
-  background: rgba(20, 184, 166, 0.12);
-  border: 1px solid rgba(94, 234, 212, 0.34);
-  color: #9ff5e8;
+  background: rgba(37, 99, 235, 0.18);
+  border: 1px solid rgba(96, 165, 250, 0.36);
+  border-radius: 8px;
+  color: #bfdbfe;
   display: inline-flex;
   font-weight: 850;
   height: 2rem;
@@ -454,8 +477,9 @@ h1 {
 
 .participant-list li {
   align-items: center;
-  background: #111418;
-  border: 1px solid #2a3039;
+  background: rgba(3, 10, 24, 0.86);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 8px;
   display: grid;
   gap: 0.65rem;
   grid-template-columns: auto 1fr auto;
@@ -497,8 +521,8 @@ textarea:focus-visible {
 :host ::ng-deep .schedule-dialog,
 :host ::ng-deep .schedule-dialog .p-dialog-header,
 :host ::ng-deep .schedule-dialog .p-dialog-content {
-  background: #171a1f;
-  border-color: #303743;
+  background: #071326;
+  border-color: rgba(148, 163, 184, 0.2);
   color: #f8fafc;
 }
 
@@ -524,6 +548,7 @@ textarea:focus-visible {
   }
 
   .entry-card,
+  .entry-title-row,
   .date-group > header {
     display: grid;
   }

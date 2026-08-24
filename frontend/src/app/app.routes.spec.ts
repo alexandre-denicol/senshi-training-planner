@@ -2,12 +2,24 @@ import { routes } from './app.routes';
 import { adminGuard, authGuard } from './auth/auth.guards';
 import { BlocksPage } from './blocks/blocks-page';
 import { CategoriesPage } from './categories/categories-page';
+import { DashboardPage } from './dashboard/dashboard-page';
 import { HistoryPage } from './history/history-page';
 import { ProfessorsPage } from './professors/professors-page';
 import { SchedulePage } from './schedule/schedule-page';
 import { WorkoutsPage } from './workouts/workouts-page';
 
 describe('routes', () => {
+  it('uses Dashboard as the authenticated landing page', () => {
+    const appRoute = routes.find((route) => route.path === 'app');
+    const defaultRoute = appRoute?.children?.find((route) => route.path === '');
+    const dashboardRoute = appRoute?.children?.find((route) => route.path === 'dashboard');
+
+    expect(appRoute?.canActivate).toEqual([authGuard]);
+    expect(defaultRoute?.redirectTo).toBe('dashboard');
+    expect(dashboardRoute?.component).toBe(DashboardPage);
+    expect(dashboardRoute?.canActivate).toBeUndefined();
+  });
+
   it('protects Agenda with authentication only so ADMIN and PROFESSOR can access it', () => {
     const appRoute = routes.find((route) => route.path === 'app');
     const agendaRoute = appRoute?.children?.find((route) => route.path === 'agenda');

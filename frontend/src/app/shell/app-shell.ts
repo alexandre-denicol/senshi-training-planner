@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
-import { Router, RouterLink, RouterOutlet } from '@angular/router';
+import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
 import { AuthService } from '../auth/auth.service';
 import { AuthUser } from '../auth/auth.models';
@@ -13,6 +13,7 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
+  { label: 'Dashboard', icon: 'pi pi-home', path: '/app/dashboard' },
   { label: 'Agenda', icon: 'pi pi-calendar', path: '/app/agenda' },
   { label: 'Treinos', icon: 'pi pi-list-check', path: '/app/treinos' },
   { label: 'Blocos', icon: 'pi pi-th-large', path: '/app/blocos' },
@@ -22,7 +23,7 @@ const navItems: NavItem[] = [
 ];
 
 @Component({
-  imports: [ButtonModule, CommonModule, RouterLink, RouterOutlet],
+  imports: [ButtonModule, CommonModule, RouterLink, RouterLinkActive, RouterOutlet],
   selector: 'app-shell',
   styleUrl: './app-shell.css',
   templateUrl: './app-shell.html',
