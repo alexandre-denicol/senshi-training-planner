@@ -10,15 +10,24 @@ export interface BlockCategory {
 export interface Block {
   id: string;
   name: string;
+  description: string | null;
+  sequence: BlockSequenceItem[];
   active: boolean;
   category: BlockCategory;
   createdAt: string;
   updatedAt: string;
 }
 
+export interface BlockSequenceItem {
+  position: number;
+  text: string;
+}
+
 export interface BlockRequest {
   name: string;
   categoryId: string;
+  description?: string | null;
+  sequence?: Array<{ text: string }>;
 }
 
 @Injectable({ providedIn: 'root' })

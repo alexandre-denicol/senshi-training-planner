@@ -133,6 +133,19 @@
             <div>
               <h3>{{ block.blockName }}</h3>
               <p>{{ block.categoryName }}</p>
+              @if (block.description) {
+                <p class="snapshot-description">{{ block.description }}</p>
+              }
+              @if (block.sequence.length > 0) {
+                <ol class="snapshot-sequence">
+                  @for (item of block.sequence; track item.position) {
+                    <li>
+                      <span>{{ item.position }}</span>
+                      <p>{{ item.text }}</p>
+                    </li>
+                  }
+                </ol>
+              }
             </div>
           </li>
         }

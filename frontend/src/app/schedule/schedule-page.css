@@ -430,6 +430,22 @@ h1 {
   overflow-wrap: anywhere;
 }
 
+.block-description,
+.sequence-preview {
+  color: #cbd5e1;
+  line-height: 1.45;
+  margin: 0.15rem 0 0;
+  white-space: pre-wrap;
+}
+
+.sequence-preview {
+  color: #93c5fd;
+  display: block;
+  font-size: 0.86rem;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
 .block-content em {
   color: #fbbf24;
 }

@@ -20,6 +20,9 @@ interface ConfirmationState {
 interface BlockForm {
   name: string;
   categoryId: string;
+  description: string;
+  sequence: string[];
+  sequenceText: string;
 }
 
 @Component({
@@ -96,6 +99,9 @@ export class BlocksPage implements OnInit {
     this.editForm = {
       name: block.name,
       categoryId: this.categoryIsActive(block.category.id) ? block.category.id : '',
+      description: block.description ?? '',
+      sequence: block.sequence.slice().sort((first, second) => first.position - second.position).map((item) => item.text),
+      sequenceText: '',
     };
     this.editDialogOpen = true;
   }
@@ -108,6 +114,42 @@ export class BlocksPage implements OnInit {
 
   protected formValid(form: BlockForm): boolean {
     return form.name.trim() !== '' && form.categoryId !== '';
+  }
+
+  protected addSequenceItem(form: BlockForm, input?: HTMLInputElement): void {
+    const text = (input?.value ?? form.sequenceText).trim();
+    if (text === '') {
+      return;
+    }
+
+    form.sequence = [...form.sequence, text];
+    form.sequenceText = '';
+    if (input) {
+      input.value = '';
+    }
+  }
+
+  protected addSequenceItemFromKeyboard(event: Event, form: BlockForm, input: HTMLInputElement): void {
+    event.preventDefault();
+    this.addSequenceItem(form, input);
+  }
+
+  protected removeSequenceItem(form: BlockForm, index: number): void {
+    form.sequence = form.sequence.filter((_, currentIndex) => currentIndex !== index);
+  }
+
+  protected moveSequenceItemUp(form: BlockForm, index: number): void {
+    if (index <= 0) {
+      return;
+    }
+    [form.sequence[index - 1], form.sequence[index]] = [form.sequence[index], form.sequence[index - 1]];
+  }
+
+  protected moveSequenceItemDown(form: BlockForm, index: number): void {
+    if (index >= form.sequence.length - 1) {
+      return;
+    }
+    [form.sequence[index], form.sequence[index + 1]] = [form.sequence[index + 1], form.sequence[index]];
   }
 
   protected confirmStatus(block: Block): void {
@@ -137,7 +179,7 @@ export class BlocksPage implements OnInit {
     this.clearMessages();
 
     try {
-      const block = await this.api.create({ name: this.createForm.name, categoryId: this.createForm.categoryId });
+      const block = await this.api.create(this.requestFromForm(this.createForm));
       this.blocks.update((items) => [...items, block].sort(compareBlocks));
       this.successMessage.set('Bloco cadastrado com sucesso.');
       this.closeCreateDialog();
@@ -157,10 +199,7 @@ export class BlocksPage implements OnInit {
     this.clearMessages();
 
     try {
-      const updated = await this.api.update(this.selectedBlock.id, {
-        name: this.editForm.name,
-        categoryId: this.editForm.categoryId,
-      });
+      const updated = await this.api.update(this.selectedBlock.id, this.requestFromForm(this.editForm));
       this.replaceBlock(updated);
       this.successMessage.set('Bloco atualizado com sucesso.');
       this.closeEditDialog();
@@ -290,8 +329,17 @@ export class BlocksPage implements OnInit {
     this.successMessage.set('');
   }
 
+  private requestFromForm(form: BlockForm) {
+    return {
+      name: form.name,
+      categoryId: form.categoryId,
+      description: form.description,
+      sequence: form.sequence.map((text) => ({ text })),
+    };
+  }
+
   private emptyForm(): BlockForm {
-    return { name: '', categoryId: '' };
+    return { name: '', categoryId: '', description: '', sequence: [], sequenceText: '' };
   }
 }
 

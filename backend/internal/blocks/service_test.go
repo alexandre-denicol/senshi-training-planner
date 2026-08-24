@@ -39,6 +39,54 @@ func TestServiceCreateBlock(t *testing.T) {
 	}
 }
 
+func TestServiceCreateBlockWithDescriptionAndSequence(t *testing.T) {
+	store := &fakeBlockStore{}
+	service := NewService(store)
+	service.newUUID = func() (string, error) { return blockID, nil }
+
+	description := "  Executar em dupla.\nPreservar distância.  "
+	block, err := service.Create(context.Background(), CreateInput{
+		Name:        "Combinação 01",
+		CategoryID:  activeCategoryID,
+		Description: &description,
+		Sequence: []SequenceItemInput{
+			{Text: "  Jab  "},
+			{Text: "Direto"},
+			{Text: "Jab"},
+			{Text: "30 segundos de manopla"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("expected create success, got %v", err)
+	}
+	if store.created[0].Description == nil || *store.created[0].Description != "Executar em dupla.\nPreservar distância." {
+		t.Fatalf("expected trimmed description, got %#v", store.created[0].Description)
+	}
+	if len(store.created[0].Sequence) != 4 {
+		t.Fatalf("expected sequence items, got %#v", store.created[0].Sequence)
+	}
+	if store.created[0].Sequence[0].Text != "Jab" || store.created[0].Sequence[0].Position != 1 {
+		t.Fatalf("expected ordered trimmed sequence, got %#v", store.created[0].Sequence)
+	}
+	if block.Sequence[2].Text != "Jab" {
+		t.Fatalf("expected duplicate text to be allowed, got %#v", block.Sequence)
+	}
+}
+
+func TestServiceNormalizesWhitespaceOnlyDescriptionToNil(t *testing.T) {
+	store := &fakeBlockStore{}
+	service := NewService(store)
+	service.newUUID = func() (string, error) { return blockID, nil }
+	description := " \n\t "
+
+	if _, err := service.Create(context.Background(), CreateInput{Name: "Base", CategoryID: activeCategoryID, Description: &description}); err != nil {
+		t.Fatalf("expected create success, got %v", err)
+	}
+	if store.created[0].Description != nil {
+		t.Fatalf("expected whitespace-only description to become nil, got %#v", store.created[0].Description)
+	}
+}
+
 func TestServiceRejectsInvalidBlockInput(t *testing.T) {
 	service := NewService(&fakeBlockStore{})
 
@@ -51,6 +99,10 @@ func TestServiceRejectsInvalidBlockInput(t *testing.T) {
 		{name: "whitespace name", input: CreateInput{Name: "   \t\n", CategoryID: activeCategoryID}, err: ErrInvalidRequest},
 		{name: "too long name", input: CreateInput{Name: strings.Repeat("á", MaxNameRunes+1), CategoryID: activeCategoryID}, err: ErrInvalidRequest},
 		{name: "invalid category uuid", input: CreateInput{Name: "Base", CategoryID: "not-a-uuid"}, err: ErrInvalidCategory},
+		{name: "too long description", input: CreateInput{Name: "Base", CategoryID: activeCategoryID, Description: stringPtr(strings.Repeat("á", MaxDescriptionRunes+1))}, err: ErrInvalidRequest},
+		{name: "blank sequence item", input: CreateInput{Name: "Base", CategoryID: activeCategoryID, Sequence: []SequenceItemInput{{Text: "   "}}}, err: ErrInvalidRequest},
+		{name: "too long sequence item", input: CreateInput{Name: "Base", CategoryID: activeCategoryID, Sequence: []SequenceItemInput{{Text: strings.Repeat("á", MaxSequenceTextRunes+1)}}}, err: ErrInvalidRequest},
+		{name: "too many sequence items", input: CreateInput{Name: "Base", CategoryID: activeCategoryID, Sequence: repeatSequenceItems(MaxSequenceItems + 1)}, err: ErrInvalidRequest},
 	}
 
 	for _, tt := range tests {
@@ -189,10 +241,13 @@ func (s *fakeBlockStore) CreateBlock(_ context.Context, block NewBlock) (Block, 
 	if s.createErr != nil {
 		return Block{}, s.createErr
 	}
-	return blockFixture(block.ID, block.Name, block.CategoryID, true), nil
+	created := blockFixture(block.ID, block.Name, block.CategoryID, true)
+	created.Description = block.Description
+	created.Sequence = sequenceItemsFromNew(block.Sequence)
+	return created, nil
 }
 
-func (s *fakeBlockStore) UpdateBlock(_ context.Context, id string, name string, categoryID string) (Block, error) {
+func (s *fakeBlockStore) UpdateBlock(_ context.Context, id string, name string, categoryID string, description *string, sequence []NewSequenceItem) (Block, error) {
 	if id == missingBlockID {
 		return Block{}, ErrNotFound
 	}
@@ -200,7 +255,10 @@ func (s *fakeBlockStore) UpdateBlock(_ context.Context, id string, name string, 
 		return Block{}, s.updateErr
 	}
 	s.updateCategoryID = categoryID
-	return blockFixture(id, name, categoryID, true), nil
+	block := blockFixture(id, name, categoryID, true)
+	block.Description = description
+	block.Sequence = sequenceItemsFromNew(sequence)
+	return block, nil
 }
 
 func (s *fakeBlockStore) SetBlockStatus(_ context.Context, id string, active bool) (Block, error) {
@@ -208,6 +266,18 @@ func (s *fakeBlockStore) SetBlockStatus(_ context.Context, id string, active boo
 		return Block{}, ErrNotFound
 	}
 	return blockFixture(id, "Base", activeCategoryID, active), nil
+}
+
+func stringPtr(value string) *string {
+	return &value
+}
+
+func repeatSequenceItems(total int) []SequenceItemInput {
+	items := make([]SequenceItemInput, total)
+	for index := range items {
+		items[index] = SequenceItemInput{Text: "Item"}
+	}
+	return items
 }
 
 func (s *fakeBlockStore) DeleteBlock(_ context.Context, id string) error {

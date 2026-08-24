@@ -105,19 +105,31 @@ func (s *PostgresStore) CompleteScheduleEntry(ctx context.Context, historyID str
 
 	const blockQuery = `
 		INSERT INTO training_history_blocks (
-			history_id, position, block_id, block_name, category_id, category_name
+			history_id, position, block_id, block_name, block_description, category_id, category_name
 		)
-		VALUES ($1, $2, $3, $4, $5, $6)`
+		VALUES ($1, $2, $3, $4, $5, $6, $7)`
 	for _, block := range blocks {
 		if _, err := tx.Exec(ctx, blockQuery,
 			historyID,
 			block.Position,
 			block.BlockID,
 			block.BlockName,
+			block.Description,
 			block.CategoryID,
 			block.CategoryName,
 		); err != nil {
 			return Detail{}, err
+		}
+	}
+
+	const sequenceQuery = `
+		INSERT INTO training_history_block_sequence_items (history_id, block_position, item_position, text)
+		VALUES ($1, $2, $3, $4)`
+	for _, block := range blocks {
+		for _, item := range block.Sequence {
+			if _, err := tx.Exec(ctx, sequenceQuery, historyID, block.Position, item.Position, item.Text); err != nil {
+				return Detail{}, err
+			}
 		}
 	}
 
@@ -160,8 +172,10 @@ type blockSnapshot struct {
 	Position     int
 	BlockID      string
 	BlockName    string
+	Description  *string
 	CategoryID   string
 	CategoryName string
+	Sequence     []SequenceItem
 }
 
 type queryer interface {
@@ -196,7 +210,7 @@ func readScheduleSnapshot(ctx context.Context, tx pgx.Tx, scheduleEntryID string
 
 func readWorkoutBlockSnapshots(ctx context.Context, tx pgx.Tx, workoutID string) ([]blockSnapshot, error) {
 	const query = `
-		SELECT wb.position, b.id::text, b.name, c.id::text, c.name
+		SELECT wb.position, b.id::text, b.name, b.description, c.id::text, c.name
 		FROM workout_blocks wb
 		JOIN blocks b ON b.id = wb.block_id
 		JOIN categories c ON c.id = b.category_id
@@ -212,16 +226,61 @@ func readWorkoutBlockSnapshots(ctx context.Context, tx pgx.Tx, workoutID string)
 	blocks := []blockSnapshot{}
 	for rows.Next() {
 		var block blockSnapshot
-		if err := rows.Scan(&block.Position, &block.BlockID, &block.BlockName, &block.CategoryID, &block.CategoryName); err != nil {
+		var description pgtype.Text
+		if err := rows.Scan(&block.Position, &block.BlockID, &block.BlockName, &description, &block.CategoryID, &block.CategoryName); err != nil {
 			return nil, err
 		}
+		if description.Valid {
+			block.Description = &description.String
+		}
+		block.Sequence = []SequenceItem{}
 		blocks = append(blocks, block)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+	if err := loadLiveBlockSequences(ctx, tx, blocks); err != nil {
+		return nil, err
+	}
 
 	return blocks, nil
+}
+
+func loadLiveBlockSequences(ctx context.Context, tx pgx.Tx, blocks []blockSnapshot) error {
+	if len(blocks) == 0 {
+		return nil
+	}
+
+	byID := make(map[string]*blockSnapshot, len(blocks))
+	ids := make([]string, 0, len(blocks))
+	for index := range blocks {
+		byID[blocks[index].BlockID] = &blocks[index]
+		ids = append(ids, blocks[index].BlockID)
+	}
+
+	const query = `
+		SELECT block_id::text, position, text
+		FROM block_sequence_items
+		WHERE block_id::text = ANY($1)
+		ORDER BY block_id, position ASC`
+	rows, err := tx.Query(ctx, query, ids)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var blockID string
+		var item SequenceItem
+		if err := rows.Scan(&blockID, &item.Position, &item.Text); err != nil {
+			return err
+		}
+		if block := byID[blockID]; block != nil {
+			block.Sequence = append(block.Sequence, item)
+		}
+	}
+
+	return rows.Err()
 }
 
 func getHistory(ctx context.Context, db queryer, id string) (Detail, error) {
@@ -258,7 +317,7 @@ func getHistory(ctx context.Context, db queryer, id string) (Detail, error) {
 	}
 
 	const blocksQuery = `
-		SELECT position, block_name, category_name
+		SELECT position, block_name, category_name, block_description
 		FROM training_history_blocks
 		WHERE history_id = $1
 		ORDER BY position ASC`
@@ -272,12 +331,20 @@ func getHistory(ctx context.Context, db queryer, id string) (Detail, error) {
 	detail.Blocks = []Block{}
 	for rows.Next() {
 		var block Block
-		if err := rows.Scan(&block.Position, &block.BlockName, &block.CategoryName); err != nil {
+		var description pgtype.Text
+		if err := rows.Scan(&block.Position, &block.BlockName, &block.CategoryName, &description); err != nil {
 			return Detail{}, err
 		}
+		if description.Valid {
+			block.Description = &description.String
+		}
+		block.Sequence = []SequenceItem{}
 		detail.Blocks = append(detail.Blocks, block)
 	}
 	if err := rows.Err(); err != nil {
+		return Detail{}, err
+	}
+	if err := loadHistoryBlockSequences(ctx, db, &detail); err != nil {
 		return Detail{}, err
 	}
 
@@ -306,6 +373,41 @@ func getHistory(ctx context.Context, db queryer, id string) (Detail, error) {
 	}
 
 	return detail, nil
+}
+
+func loadHistoryBlockSequences(ctx context.Context, db queryer, detail *Detail) error {
+	if len(detail.Blocks) == 0 {
+		return nil
+	}
+
+	byPosition := make(map[int]*Block, len(detail.Blocks))
+	for index := range detail.Blocks {
+		byPosition[detail.Blocks[index].Position] = &detail.Blocks[index]
+	}
+
+	const query = `
+		SELECT block_position, item_position, text
+		FROM training_history_block_sequence_items
+		WHERE history_id = $1
+		ORDER BY block_position ASC, item_position ASC`
+	rows, err := db.Query(ctx, query, detail.ID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var blockPosition int
+		var item SequenceItem
+		if err := rows.Scan(&blockPosition, &item.Position, &item.Text); err != nil {
+			return err
+		}
+		if block := byPosition[blockPosition]; block != nil {
+			block.Sequence = append(block.Sequence, item)
+		}
+	}
+
+	return rows.Err()
 }
 
 type listItemScanner interface {

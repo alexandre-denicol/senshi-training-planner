@@ -238,6 +238,9 @@
           <div>
             <h3>{{ block.name }}</h3>
             <p>{{ block.category.name }}</p>
+            @if (sequencePreview(block)) {
+              <small class="sequence-preview">{{ sequencePreview(block) }}</small>
+            }
             @if (!block.active) {
               <span class="inline-badge">Inativo</span>
             }
@@ -317,6 +320,9 @@
               <div>
                 <h3>{{ block.name }}</h3>
                 <p>{{ block.category.name }}</p>
+                @if (sequencePreview(block)) {
+                  <small class="sequence-preview">{{ sequencePreview(block) }}</small>
+                }
               </div>
               <button pButton type="button" class="secondary-action" (click)="addExistingBlock(block)">
                 <i class="pi pi-plus" aria-hidden="true"></i>
@@ -379,6 +385,57 @@
               <span>Criar categoria</span>
             </button>
           </div>
+        }
+      </div>
+
+      <label>
+        <span>Descrição / instruções (opcional)</span>
+        <textarea
+          name="context-block-description"
+          rows="4"
+          autocomplete="off"
+          [(ngModel)]="blockCreateForm.description"
+        ></textarea>
+      </label>
+
+      <div class="sequence-editor">
+        <span>Sequência livre (opcional)</span>
+        <div class="sequence-add-row">
+          <input
+            #contextSequenceInput
+            pInputText
+            type="text"
+            name="context-block-sequence-text"
+            autocomplete="off"
+            [(ngModel)]="blockCreateForm.sequenceText"
+            (keydown.enter)="addBlockSequenceItemFromKeyboard($event, contextSequenceInput)"
+          />
+          <button pButton type="button" class="secondary-action" (click)="addBlockSequenceItem(contextSequenceInput)" [disabled]="blockCreateForm.sequenceText.trim() === '' || submitting()">
+            <i class="pi pi-plus" aria-hidden="true"></i>
+            <span>Adicionar</span>
+          </button>
+        </div>
+
+        @if (blockCreateForm.sequence.length > 0) {
+          <ol class="sequence-list">
+            @for (item of blockCreateForm.sequence; track $index) {
+              <li>
+                <span class="sequence-position">{{ $index + 1 }}</span>
+                <span class="sequence-text">{{ item }}</span>
+                <div class="sequence-actions">
+                  <button pButton type="button" class="icon-action" [attr.aria-label]="'Mover item ' + ($index + 1) + ' para cima'" title="Mover para cima" (click)="moveBlockSequenceItemUp($index)" [disabled]="$index === 0 || submitting()">
+                    <i class="pi pi-chevron-up" aria-hidden="true"></i>
+                  </button>
+                  <button pButton type="button" class="icon-action" [attr.aria-label]="'Mover item ' + ($index + 1) + ' para baixo'" title="Mover para baixo" (click)="moveBlockSequenceItemDown($index)" [disabled]="$index === blockCreateForm.sequence.length - 1 || submitting()">
+                    <i class="pi pi-chevron-down" aria-hidden="true"></i>
+                  </button>
+                  <button pButton type="button" class="icon-action danger-action" [attr.aria-label]="'Remover item ' + ($index + 1)" title="Remover" (click)="removeBlockSequenceItem($index)" [disabled]="submitting()">
+                    <i class="pi pi-trash" aria-hidden="true"></i>
+                  </button>
+                </div>
+              </li>
+            }
+          </ol>
         }
       </div>
 

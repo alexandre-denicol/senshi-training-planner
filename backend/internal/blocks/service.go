@@ -26,7 +26,7 @@ func (s *Service) List(ctx context.Context) ([]Block, error) {
 }
 
 func (s *Service) Create(ctx context.Context, input CreateInput) (Block, error) {
-	name, categoryID, err := validateBlockInput(input.Name, input.CategoryID)
+	clean, err := validateBlockInput(input.Name, input.CategoryID, input.Description, input.Sequence)
 	if err != nil {
 		return Block{}, err
 	}
@@ -35,7 +35,13 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (Block, error) 
 		return Block{}, err
 	}
 
-	block, err := s.store.CreateBlock(ctx, NewBlock{ID: id, Name: name, CategoryID: categoryID})
+	block, err := s.store.CreateBlock(ctx, NewBlock{
+		ID:          id,
+		Name:        clean.Name,
+		CategoryID:  clean.CategoryID,
+		Description: clean.Description,
+		Sequence:    clean.Sequence,
+	})
 	return mapBlockResult(block, err)
 }
 
@@ -43,12 +49,12 @@ func (s *Service) Update(ctx context.Context, id string, input UpdateInput) (Blo
 	if !validID(id) {
 		return Block{}, ErrNotFound
 	}
-	name, categoryID, err := validateBlockInput(input.Name, input.CategoryID)
+	clean, err := validateBlockInput(input.Name, input.CategoryID, input.Description, input.Sequence)
 	if err != nil {
 		return Block{}, err
 	}
 
-	block, err := s.store.UpdateBlock(ctx, id, name, categoryID)
+	block, err := s.store.UpdateBlock(ctx, id, clean.Name, clean.CategoryID, clean.Description, clean.Sequence)
 	return mapBlockResult(block, err)
 }
 
@@ -103,19 +109,77 @@ func mapBlockResult(block Block, err error) (Block, error) {
 	return block, nil
 }
 
-func validateBlockInput(name string, categoryID string) (string, string, error) {
+type validatedBlockInput struct {
+	Name        string
+	CategoryID  string
+	Description *string
+	Sequence    []NewSequenceItem
+}
+
+func validateBlockInput(name string, categoryID string, description *string, sequence []SequenceItemInput) (validatedBlockInput, error) {
 	trimmedName := strings.TrimSpace(name)
 	if trimmedName == "" {
-		return "", "", ErrInvalidRequest
+		return validatedBlockInput{}, ErrInvalidRequest
 	}
 	if utf8.RuneCountInString(trimmedName) > MaxNameRunes {
-		return "", "", ErrInvalidRequest
+		return validatedBlockInput{}, ErrInvalidRequest
 	}
 	if !validID(categoryID) {
-		return "", "", ErrInvalidCategory
+		return validatedBlockInput{}, ErrInvalidCategory
 	}
 
-	return trimmedName, categoryID, nil
+	normalizedDescription := normalizeOptionalText(description)
+	if normalizedDescription != nil && utf8.RuneCountInString(*normalizedDescription) > MaxDescriptionRunes {
+		return validatedBlockInput{}, ErrInvalidRequest
+	}
+
+	normalizedSequence, err := normalizeSequence(sequence)
+	if err != nil {
+		return validatedBlockInput{}, err
+	}
+
+	return validatedBlockInput{
+		Name:        trimmedName,
+		CategoryID:  categoryID,
+		Description: normalizedDescription,
+		Sequence:    normalizedSequence,
+	}, nil
+}
+
+func normalizeOptionalText(value *string) *string {
+	if value == nil {
+		return nil
+	}
+
+	trimmed := strings.TrimSpace(*value)
+	if trimmed == "" {
+		return nil
+	}
+
+	return &trimmed
+}
+
+func normalizeSequence(sequence []SequenceItemInput) ([]NewSequenceItem, error) {
+	if len(sequence) > MaxSequenceItems {
+		return nil, ErrInvalidRequest
+	}
+
+	normalized := make([]NewSequenceItem, 0, len(sequence))
+	for index, item := range sequence {
+		text := strings.TrimSpace(item.Text)
+		if text == "" {
+			return nil, ErrInvalidRequest
+		}
+		if utf8.RuneCountInString(text) > MaxSequenceTextRunes {
+			return nil, ErrInvalidRequest
+		}
+		normalized = append(normalized, NewSequenceItem{
+			Position: index + 1,
+			Text:     text,
+		})
+	}
+
+	return normalized, nil
 }
 
 func validID(id string) bool {

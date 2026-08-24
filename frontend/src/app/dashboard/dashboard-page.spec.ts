@@ -212,6 +212,8 @@ function workoutBlock(overrides: Partial<WorkoutDetail['blocks'][number]> = {}):
   return {
     id: 'block-1',
     name: 'Bloco',
+    description: null,
+    sequence: [],
     active: true,
     position: 1,
     category: { id: 'category-1', name: 'Categoria' },
@@ -223,6 +225,8 @@ function block(overrides: Partial<Block> = {}): Block {
   return {
     id: 'block-1',
     name: 'Bloco',
+    description: null,
+    sequence: [],
     active: true,
     category: { id: 'category-1', name: 'Categoria' },
     createdAt: '2026-08-23T00:00:00Z',
@@ -266,7 +270,7 @@ function historyDetail(overrides: Partial<HistoryDetail> = {}): HistoryDetail {
     notes: null,
     completedByName: 'Professor',
     completedAt: '2026-08-20T12:00:00Z',
-    blocks: [{ position: 1, blockName: 'Bloco', categoryName: 'Categoria' }],
+    blocks: [{ position: 1, blockName: 'Bloco', categoryName: 'Categoria', description: null, sequence: [] }],
     ...overrides,
   };
 }

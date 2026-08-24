@@ -31,11 +31,18 @@ type WorkoutListItem struct {
 }
 
 type WorkoutBlock struct {
-	ID       string      `json:"id"`
-	Name     string      `json:"name"`
-	Active   bool        `json:"active"`
-	Position int         `json:"position"`
-	Category CategoryRef `json:"category"`
+	ID          string              `json:"id"`
+	Name        string              `json:"name"`
+	Description *string             `json:"description"`
+	Sequence    []BlockSequenceItem `json:"sequence"`
+	Active      bool                `json:"active"`
+	Position    int                 `json:"position"`
+	Category    CategoryRef         `json:"category"`
+}
+
+type BlockSequenceItem struct {
+	Position int    `json:"position"`
+	Text     string `json:"text"`
 }
 
 type WorkoutDetail struct {

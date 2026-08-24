@@ -236,7 +236,8 @@ dd {
 }
 
 .dialog-form input,
-.dialog-form select {
+.dialog-form select,
+.dialog-form textarea {
   background: #111418;
   border: 1px solid #343a45;
   border-radius: 6px;
@@ -244,6 +245,80 @@ dd {
   min-height: 2.6rem;
   padding: 0.65rem 0.75rem;
   width: 100%;
+}
+
+.dialog-form textarea {
+  line-height: 1.45;
+  min-height: 7rem;
+  resize: vertical;
+  white-space: pre-wrap;
+}
+
+.sequence-editor {
+  background: #14171c;
+  border: 1px solid #2a3039;
+  border-radius: 6px;
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.85rem;
+}
+
+.sequence-editor h2 {
+  color: #fff;
+  font-size: 1rem;
+  margin: 0;
+}
+
+.sequence-editor p {
+  color: #aebacc;
+  line-height: 1.4;
+  margin: 0.25rem 0 0;
+}
+
+.sequence-add-row {
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: 1fr auto;
+}
+
+.sequence-add-row .secondary-action {
+  align-items: center;
+  display: inline-flex;
+  gap: 0.45rem;
+}
+
+.sequence-list {
+  display: grid;
+  gap: 0.45rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sequence-list li {
+  align-items: center;
+  background: #111418;
+  border: 1px solid #2a3039;
+  border-radius: 6px;
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding: 0.55rem;
+}
+
+.sequence-position {
+  color: #9ff5e8;
+  font-weight: 850;
+}
+
+.sequence-text {
+  color: #f8fafc;
+  overflow-wrap: anywhere;
+}
+
+.sequence-actions {
+  display: flex;
+  gap: 0.35rem;
 }
 
 .dialog-actions {
@@ -274,7 +349,8 @@ dd {
 
 button:focus-visible,
 input:focus-visible,
-select:focus-visible {
+select:focus-visible,
+textarea:focus-visible {
   outline: 2px solid #5eead4;
   outline-offset: 2px;
 }
@@ -321,5 +397,14 @@ select:focus-visible {
 
   .dialog-actions {
     display: grid;
+  }
+
+  .sequence-add-row,
+  .sequence-list li {
+    grid-template-columns: 1fr;
+  }
+
+  .sequence-actions {
+    justify-content: flex-start;
   }
 }

@@ -17,6 +17,13 @@ export interface HistoryBlock {
   position: number;
   blockName: string;
   categoryName: string;
+  description: string | null;
+  sequence: HistorySequenceItem[];
+}
+
+export interface HistorySequenceItem {
+  position: number;
+  text: string;
 }
 
 export interface HistoryDetail {

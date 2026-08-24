@@ -384,6 +384,10 @@ export class SchedulePage implements OnInit {
     return workout.active ? workout.name : `${workout.name} (inativo)`;
   }
 
+  protected sequencePreview(block: { sequence?: Array<{ text: string }> }): string {
+    return block.sequence?.map((item) => item.text).join(' → ') ?? '';
+  }
+
   protected isCompleted(entry: ScheduleEntry): boolean {
     return Boolean(entry.completedAt);
   }

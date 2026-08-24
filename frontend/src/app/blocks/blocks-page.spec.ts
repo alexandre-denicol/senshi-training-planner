@@ -2,7 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { Category, CategoryApiService } from '../categories/category-api.service';
-import { Block, BlockApiService } from './block-api.service';
+import { Block, BlockApiService, BlockRequest } from './block-api.service';
 import { BlocksPage } from './blocks-page';
 
 describe('BlocksPage', () => {
@@ -37,22 +37,54 @@ describe('BlocksPage', () => {
     const { fixture, component } = await renderPage([], [category()], blockApi);
 
     component.openCreateDialog();
-    component.createForm = { name: 'Base', categoryId: 'category-id' };
+    component.createForm = { name: 'Base', categoryId: 'category-id', description: 'Instruções gerais', sequence: ['Item A'], sequenceText: '' };
     await component.createBlock();
     fixture.detectChanges();
 
-    expect(blockApi.created).toEqual([{ name: 'Base', categoryId: 'category-id' }]);
-    expect(component.createForm).toEqual({ name: '', categoryId: '' });
+    expect(blockApi.created).toEqual([{ name: 'Base', categoryId: 'category-id', description: 'Instruções gerais', sequence: [{ text: 'Item A' }] }]);
+    expect(component.createForm).toEqual({ name: '', categoryId: '', description: '', sequence: [], sequenceText: '' });
     expect(component.blocks()).toHaveLength(1);
     expect(fixture.nativeElement.textContent).toContain('Bloco cadastrado com sucesso.');
 
     blockApi.createError = new HttpErrorResponse({ status: 409, statusText: 'Conflict' });
     component.openCreateDialog();
-    component.createForm = { name: 'base', categoryId: 'category-id' };
+    component.createForm = { name: 'base', categoryId: 'category-id', description: '', sequence: [], sequenceText: '' };
     await component.createBlock();
     fixture.detectChanges();
 
     expect(fixture.nativeElement.textContent).toContain('Já existe um bloco com este nome nesta categoria.');
+  });
+
+  it('creates a generic block without optional description or sequence', async () => {
+    const blockApi = new FakeBlockApi([]);
+    const { component } = await renderPage([], [category()], blockApi);
+
+    component.openCreateDialog();
+    component.createForm = { name: 'Aquecimento livre', categoryId: 'category-id', description: '', sequence: [], sequenceText: '' };
+    await component.createBlock();
+
+    expect(blockApi.created[0]).toEqual({ name: 'Aquecimento livre', categoryId: 'category-id', description: '', sequence: [] });
+  });
+
+  it('manages free-text sequence items with enter, ordering, removal and duplicates', async () => {
+    const { component } = await renderPage([], [category()]);
+    const input = document.createElement('input');
+    let prevented = false;
+
+    input.value = 'Jab';
+    component.addSequenceItemFromKeyboard({ preventDefault: () => { prevented = true; } }, component.createForm, input);
+    input.value = 'Direto';
+    component.addSequenceItem(component.createForm, input);
+    input.value = 'Jab';
+    component.addSequenceItem(component.createForm, input);
+    expect(component.createForm.sequence).toEqual(['Jab', 'Direto', 'Jab']);
+    component.moveSequenceItemUp(component.createForm, 1);
+    component.moveSequenceItemDown(component.createForm, 0);
+    component.removeSequenceItem(component.createForm, 2);
+
+    expect(prevented).toBe(true);
+    expect(component.createForm.sequence).toEqual(['Jab', 'Direto']);
+    expect(component.createForm.sequenceText).toBe('');
   });
 
   it('prevents creation when there are no active categories', async () => {
@@ -75,13 +107,30 @@ describe('BlocksPage', () => {
     );
 
     component.openEditDialog(original);
-    component.editForm = { name: 'Avançado', categoryId: 'cat-2' };
+    component.editForm = { name: 'Avançado', categoryId: 'cat-2', description: '', sequence: [], sequenceText: '' };
     await component.updateBlock();
     fixture.detectChanges();
 
-    expect(blockApi.updated[0]).toEqual({ id: 'block-1', request: { name: 'Avançado', categoryId: 'cat-2' } });
+    expect(blockApi.updated[0]).toEqual({ id: 'block-1', request: { name: 'Avançado', categoryId: 'cat-2', description: '', sequence: [] } });
     expect(fixture.nativeElement.textContent).toContain('Avançado');
     expect(fixture.nativeElement.textContent).toContain('Mobilidade');
+  });
+
+  it('loads existing description and ordered sequence for editing', async () => {
+    const original = block({
+      id: 'block-1',
+      description: 'Executar em dupla.',
+      sequence: [
+        { position: 1, text: 'Defende' },
+        { position: 2, text: 'Responde' },
+      ],
+    });
+    const { component } = await renderPage([original], [category()]);
+
+    component.openEditDialog(original);
+
+    expect(component.editForm.description).toBe('Executar em dupla.');
+    expect(component.editForm.sequence).toEqual(['Defende', 'Responde']);
   });
 
   it('requires an active category when editing a block whose category became inactive', async () => {
@@ -149,14 +198,14 @@ describe('BlocksPage', () => {
     const { component } = await renderPage([original], [category()]);
 
     component.openCreateDialog();
-    component.createForm = { name: 'Temporário', categoryId: 'category-id' };
+    component.createForm = { name: 'Temporário', categoryId: 'category-id', description: 'texto', sequence: ['um'], sequenceText: 'rascunho' };
     component.closeCreateDialog();
-    expect(component.createForm).toEqual({ name: '', categoryId: '' });
+    expect(component.createForm).toEqual({ name: '', categoryId: '', description: '', sequence: [], sequenceText: '' });
 
     component.openEditDialog(original);
-    component.editForm = { name: 'Temporário', categoryId: 'category-id' };
+    component.editForm = { name: 'Temporário', categoryId: 'category-id', description: 'texto', sequence: ['um'], sequenceText: 'rascunho' };
     component.closeEditDialog();
-    expect(component.editForm).toEqual({ name: '', categoryId: '' });
+    expect(component.editForm).toEqual({ name: '', categoryId: '', description: '', sequence: [], sequenceText: '' });
   });
 });
 
@@ -197,6 +246,8 @@ function block(overrides: Partial<Block> = {}): Block {
   return {
     id: 'block-id',
     name: 'Bloco',
+    description: null,
+    sequence: [],
     active: true,
     category: {
       id: 'category-id',
@@ -209,8 +260,8 @@ function block(overrides: Partial<Block> = {}): Block {
 }
 
 class FakeBlockApi {
-  created: Array<{ name: string; categoryId: string }> = [];
-  updated: Array<{ id: string; request: { name: string; categoryId: string } }> = [];
+  created: BlockRequest[] = [];
+  updated: Array<{ id: string; request: BlockRequest }> = [];
   statusChanges: Array<{ id: string; active: boolean }> = [];
   deleted: string[] = [];
   createError: unknown = null;
@@ -222,7 +273,7 @@ class FakeBlockApi {
     return this.blocks;
   }
 
-  async create(request: { name: string; categoryId: string }): Promise<Block> {
+  async create(request: BlockRequest): Promise<Block> {
     this.created.push(request);
     if (this.createError) {
       throw this.createError;
@@ -231,6 +282,8 @@ class FakeBlockApi {
     const created = block({
       id: `block-${this.created.length}`,
       name: request.name,
+      description: request.description ?? null,
+      sequence: (request.sequence ?? []).map((item, index) => ({ position: index + 1, text: item.text })),
       active: true,
       category: { id: request.categoryId, name: request.categoryId === 'cat-2' ? 'Mobilidade' : 'Categoria' },
     });
@@ -238,12 +291,14 @@ class FakeBlockApi {
     return created;
   }
 
-  async update(id: string, request: { name: string; categoryId: string }): Promise<Block> {
+  async update(id: string, request: BlockRequest): Promise<Block> {
     this.updated.push({ id, request });
     const current = this.blocks.find((item) => item.id === id) ?? block({ id });
     const updated = {
       ...current,
       name: request.name,
+      description: request.description ?? null,
+      sequence: (request.sequence ?? []).map((item, index) => ({ position: index + 1, text: item.text })),
       category: { id: request.categoryId, name: request.categoryId === 'cat-2' ? 'Mobilidade' : current.category.name },
     };
     this.blocks = this.blocks.map((item) => item.id === id ? updated : item);
