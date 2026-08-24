@@ -7,9 +7,12 @@ import { ButtonModule } from 'primeng/button';
 import { DialogModule } from 'primeng/dialog';
 import { InputTextModule } from 'primeng/inputtext';
 import { Block, BlockApiService } from '../blocks/block-api.service';
+import { Category, CategoryApiService } from '../categories/category-api.service';
+import { ScheduleApiService } from '../schedule/schedule-api.service';
 import { WorkoutBlock, WorkoutDetail, WorkoutListItem, WorkoutApiService } from './workout-api.service';
 
 type ConfirmationKind = 'status' | 'delete';
+type AddBlockMode = 'select' | 'create';
 
 interface ConfirmationState {
   kind: ConfirmationKind;
@@ -19,8 +22,12 @@ interface ConfirmationState {
 
 interface WorkoutForm {
   name: string;
-  selectedBlockId: string;
   blocks: WorkoutBlock[];
+}
+
+interface BlockForm {
+  name: string;
+  categoryId: string;
 }
 
 @Component({
@@ -32,27 +39,47 @@ interface WorkoutForm {
 export class WorkoutsPage implements OnInit {
   private readonly api = inject(WorkoutApiService);
   private readonly blockApi = inject(BlockApiService);
+  private readonly categoryApi = inject(CategoryApiService);
+  private readonly scheduleApi = inject(ScheduleApiService);
   private readonly router = inject(Router);
   private readonly dateFormatter = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' });
 
   protected readonly workouts = signal<WorkoutListItem[]>([]);
   protected readonly blocks = signal<Block[]>([]);
+  protected readonly categories = signal<Category[]>([]);
   protected readonly loading = signal(true);
   protected readonly submitting = signal(false);
   protected readonly detailLoading = signal(false);
   protected readonly rowActionId = signal<string | null>(null);
   protected readonly errorMessage = signal('');
   protected readonly successMessage = signal('');
+  protected readonly builderErrorMessage = signal('');
+  protected readonly addBlockErrorMessage = signal('');
+  protected readonly addBlockFeedback = signal('');
+  protected readonly categoryErrorMessage = signal('');
+  protected readonly scheduleErrorMessage = signal('');
   protected readonly confirmation = signal<ConfirmationState | null>(null);
   protected readonly hasWorkouts = computed(() => this.workouts().length > 0);
   protected readonly activeBlocks = computed(() => this.blocks().filter((block) => block.active));
   protected readonly hasActiveBlocks = computed(() => this.activeBlocks().length > 0);
+  protected readonly activeCategories = computed(() => this.categories().filter((category) => category.active));
+  protected readonly hasActiveCategories = computed(() => this.activeCategories().length > 0);
 
   protected createDialogOpen = false;
   protected editDialogOpen = false;
+  protected addBlockDialogOpen = false;
+  protected categoryDialogOpen = false;
+  protected postSaveDialogOpen = false;
+  protected addBlockMode: AddBlockMode = 'select';
   protected selectedWorkout: WorkoutListItem | null = null;
+  protected activeBuilderForm: WorkoutForm | null = null;
+  protected createdWorkout: WorkoutDetail | null = null;
+  protected blockSearch = '';
   protected createForm = this.emptyForm();
   protected editForm = this.emptyForm();
+  protected blockCreateForm = this.emptyBlockForm();
+  protected categoryCreateForm = { name: '' };
+  protected scheduleForm = { scheduledDate: todayISODate() };
 
   async ngOnInit(): Promise<void> {
     await this.loadData();
@@ -63,12 +90,14 @@ export class WorkoutsPage implements OnInit {
     this.errorMessage.set('');
 
     try {
-      const [workouts, blocks] = await Promise.all([
+      const [workouts, blocks, categories] = await Promise.all([
         this.api.list(),
         this.blockApi.list(),
+        this.categoryApi.list(),
       ]);
       this.workouts.set(workouts);
       this.blocks.set(blocks);
+      this.categories.set(categories);
     } catch (error) {
       await this.handleRequestError(error);
     } finally {
@@ -78,11 +107,6 @@ export class WorkoutsPage implements OnInit {
 
   protected openCreateDialog(): void {
     this.clearMessages();
-    if (!this.hasActiveBlocks()) {
-      this.errorMessage.set('Cadastre ou ative pelo menos um bloco antes de criar um treino.');
-      return;
-    }
-
     this.createForm = this.emptyForm();
     this.createDialogOpen = true;
   }
@@ -120,19 +144,59 @@ export class WorkoutsPage implements OnInit {
     return form.name.trim() !== '' && form.blocks.length > 0;
   }
 
-  protected availableBlocks(form: WorkoutForm): Block[] {
+  protected availableBlocks(form: WorkoutForm | null): Block[] {
+    if (!form) {
+      return [];
+    }
+
     const selected = new Set(form.blocks.map((block) => block.id));
     return this.activeBlocks().filter((block) => !selected.has(block.id));
   }
 
-  protected addSelectedBlock(form: WorkoutForm): void {
-    if (!form.selectedBlockId) {
-      return;
+  protected filteredAvailableBlocks(): Block[] {
+    const query = this.blockSearch.trim().toLocaleLowerCase('pt-BR');
+    const blocks = this.availableBlocks(this.activeBuilderForm);
+    if (query === '') {
+      return blocks;
     }
 
-    const block = this.activeBlocks().find((item) => item.id === form.selectedBlockId);
-    if (!block || form.blocks.some((item) => item.id === block.id)) {
-      form.selectedBlockId = '';
+    return blocks.filter((block) =>
+      block.name.toLocaleLowerCase('pt-BR').includes(query)
+      || block.category.name.toLocaleLowerCase('pt-BR').includes(query),
+    );
+  }
+
+  protected openAddBlockDialog(form: WorkoutForm): void {
+    this.clearContextMessages();
+    this.activeBuilderForm = form;
+    this.blockSearch = '';
+    this.blockCreateForm = this.emptyBlockForm();
+    this.addBlockMode = 'select';
+    this.addBlockDialogOpen = true;
+  }
+
+  protected closeAddBlockDialog(): void {
+    this.addBlockDialogOpen = false;
+    this.activeBuilderForm = null;
+    this.blockSearch = '';
+    this.blockCreateForm = this.emptyBlockForm();
+    this.clearContextMessages();
+  }
+
+  protected showCreateBlock(): void {
+    this.clearContextMessages();
+    this.blockCreateForm = this.emptyBlockForm();
+    this.addBlockMode = 'create';
+  }
+
+  protected showBlockSelection(): void {
+    this.clearContextMessages();
+    this.addBlockMode = 'select';
+  }
+
+  protected addExistingBlock(block: Block): void {
+    const form = this.activeBuilderForm;
+    if (!form || form.blocks.some((item) => item.id === block.id) || !block.active) {
       return;
     }
 
@@ -140,8 +204,75 @@ export class WorkoutsPage implements OnInit {
       ...form.blocks,
       this.workoutBlockFromBlock(block, form.blocks.length + 1),
     ];
-    form.selectedBlockId = '';
     this.reposition(form);
+    this.addBlockFeedback.set('Bloco adicionado ao treino.');
+  }
+
+  protected blockFormValid(): boolean {
+    return this.blockCreateForm.name.trim() !== '' && this.blockCreateForm.categoryId !== '';
+  }
+
+  protected categoryFormValid(): boolean {
+    return this.categoryCreateForm.name.trim() !== '';
+  }
+
+  protected openCategoryDialog(): void {
+    this.categoryErrorMessage.set('');
+    this.categoryCreateForm = { name: '' };
+    this.categoryDialogOpen = true;
+  }
+
+  protected closeCategoryDialog(): void {
+    this.categoryDialogOpen = false;
+    this.categoryCreateForm = { name: '' };
+    this.categoryErrorMessage.set('');
+  }
+
+  protected async createCategoryInBuilder(): Promise<void> {
+    if (!this.categoryFormValid() || this.submitting()) {
+      return;
+    }
+
+    this.submitting.set(true);
+    this.categoryErrorMessage.set('');
+
+    try {
+      const category = await this.categoryApi.create({ name: this.categoryCreateForm.name });
+      this.categories.update((items) => [...items, category].sort(compareCategories));
+      this.blockCreateForm.categoryId = category.id;
+      this.addBlockFeedback.set('Categoria criada.');
+      this.closeCategoryDialog();
+    } catch (error) {
+      this.handleCategoryRequestError(error);
+    } finally {
+      this.submitting.set(false);
+    }
+  }
+
+  protected async createBlockInBuilder(): Promise<void> {
+    const form = this.activeBuilderForm;
+    if (!form || !this.blockFormValid() || this.submitting()) {
+      return;
+    }
+
+    this.submitting.set(true);
+    this.addBlockErrorMessage.set('');
+    this.addBlockFeedback.set('');
+
+    try {
+      const block = await this.blockApi.create({
+        name: this.blockCreateForm.name,
+        categoryId: this.blockCreateForm.categoryId,
+      });
+      this.blocks.update((items) => [...items, block].sort(compareBlocks));
+      this.addExistingBlock(block);
+      this.successMessage.set('Bloco criado e adicionado ao treino.');
+      this.closeAddBlockDialog();
+    } catch (error) {
+      this.handleBlockRequestError(error);
+    } finally {
+      this.submitting.set(false);
+    }
   }
 
   protected removeBlock(form: WorkoutForm, index: number): void {
@@ -195,7 +326,10 @@ export class WorkoutsPage implements OnInit {
       const workout = await this.api.create(this.requestFromForm(this.createForm));
       this.workouts.update((items) => [...items, this.listItemFromDetail(workout)].sort(compareWorkouts));
       this.successMessage.set('Treino cadastrado com sucesso.');
+      this.createdWorkout = workout;
+      this.scheduleForm = { scheduledDate: todayISODate() };
       this.closeCreateDialog();
+      this.postSaveDialogOpen = true;
     } catch (error) {
       await this.handleRequestError(error);
     } finally {
@@ -304,6 +438,41 @@ export class WorkoutsPage implements OnInit {
     return 'O treino ficará indisponível para uso futuro.';
   }
 
+  protected closePostSaveDialog(): void {
+    this.postSaveDialogOpen = false;
+    this.createdWorkout = null;
+    this.scheduleForm = { scheduledDate: todayISODate() };
+    this.scheduleErrorMessage.set('');
+  }
+
+  protected async scheduleCreatedWorkout(): Promise<void> {
+    if (!this.createdWorkout || this.scheduleForm.scheduledDate === '' || this.submitting()) {
+      return;
+    }
+
+    this.submitting.set(true);
+    this.scheduleErrorMessage.set('');
+
+    try {
+      await this.scheduleApi.create({
+        workoutId: this.createdWorkout.id,
+        scheduledDate: this.scheduleForm.scheduledDate,
+      });
+      this.successMessage.set('Treino agendado com sucesso.');
+      this.closePostSaveDialog();
+    } catch (error) {
+      if (error instanceof HttpErrorResponse && error.status === 409) {
+        this.scheduleErrorMessage.set('Este treino já está agendado para esta data.');
+      } else if (error instanceof HttpErrorResponse && error.status === 400) {
+        this.scheduleErrorMessage.set('Verifique os dados informados.');
+      } else {
+        this.scheduleErrorMessage.set('Não foi possível concluir a operação. Tente novamente.');
+      }
+    } finally {
+      this.submitting.set(false);
+    }
+  }
+
   private requestFromForm(form: WorkoutForm) {
     return {
       name: form.name,
@@ -331,7 +500,6 @@ export class WorkoutsPage implements OnInit {
   private formFromDetail(detail: WorkoutDetail): WorkoutForm {
     return {
       name: detail.name,
-      selectedBlockId: '',
       blocks: detail.blocks
         .slice()
         .sort((first, second) => first.position - second.position)
@@ -380,6 +548,36 @@ export class WorkoutsPage implements OnInit {
     this.errorMessage.set('Não foi possível concluir a operação. Tente novamente.');
   }
 
+  private handleBlockRequestError(error: unknown): void {
+    if (error instanceof HttpErrorResponse) {
+      if (error.status === 400) {
+        this.addBlockErrorMessage.set('Verifique os dados informados.');
+        return;
+      }
+      if (error.status === 409) {
+        this.addBlockErrorMessage.set('Já existe um bloco com este nome nesta categoria.');
+        return;
+      }
+    }
+
+    this.addBlockErrorMessage.set('Não foi possível concluir a operação. Tente novamente.');
+  }
+
+  private handleCategoryRequestError(error: unknown): void {
+    if (error instanceof HttpErrorResponse) {
+      if (error.status === 400) {
+        this.categoryErrorMessage.set('Verifique os dados informados.');
+        return;
+      }
+      if (error.status === 409) {
+        this.categoryErrorMessage.set('Já existe uma categoria com este nome.');
+        return;
+      }
+    }
+
+    this.categoryErrorMessage.set('Não foi possível concluir a operação. Tente novamente.');
+  }
+
   private isConflict(error: unknown): boolean {
     return error instanceof HttpErrorResponse && error.status === 409;
   }
@@ -387,13 +585,47 @@ export class WorkoutsPage implements OnInit {
   private clearMessages(): void {
     this.errorMessage.set('');
     this.successMessage.set('');
+    this.builderErrorMessage.set('');
+    this.clearContextMessages();
+    this.scheduleErrorMessage.set('');
+  }
+
+  private clearContextMessages(): void {
+    this.addBlockErrorMessage.set('');
+    this.addBlockFeedback.set('');
+    this.categoryErrorMessage.set('');
   }
 
   private emptyForm(): WorkoutForm {
-    return { name: '', selectedBlockId: '', blocks: [] };
+    return { name: '', blocks: [] };
+  }
+
+  private emptyBlockForm(): BlockForm {
+    return { name: '', categoryId: '' };
   }
 }
 
 function compareWorkouts(first: WorkoutListItem, second: WorkoutListItem): number {
   return first.name.localeCompare(second.name, 'pt-BR', { sensitivity: 'base' });
+}
+
+function compareBlocks(first: Block, second: Block): number {
+  const categoryComparison = first.category.name.localeCompare(second.category.name, 'pt-BR', { sensitivity: 'base' });
+  if (categoryComparison !== 0) {
+    return categoryComparison;
+  }
+
+  return first.name.localeCompare(second.name, 'pt-BR', { sensitivity: 'base' });
+}
+
+function compareCategories(first: Category, second: Category): number {
+  return first.name.localeCompare(second.name, 'pt-BR', { sensitivity: 'base' });
+}
+
+function todayISODate(): string {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }

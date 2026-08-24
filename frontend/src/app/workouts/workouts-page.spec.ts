@@ -2,7 +2,9 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { Block, BlockApiService } from '../blocks/block-api.service';
-import { WorkoutApiService, WorkoutDetail, WorkoutListItem } from './workout-api.service';
+import { Category, CategoryApiService } from '../categories/category-api.service';
+import { ScheduleApiService } from '../schedule/schedule-api.service';
+import { WorkoutApiService, WorkoutBlock, WorkoutDetail, WorkoutListItem } from './workout-api.service';
 import { WorkoutsPage } from './workouts-page';
 
 describe('WorkoutsPage', () => {
@@ -37,37 +39,38 @@ describe('WorkoutsPage', () => {
 
     component.openCreateDialog();
     component.createForm.name = 'Treino';
-    component.createForm.selectedBlockId = 'block-1';
-    component.addSelectedBlock(component.createForm);
-    component.createForm.selectedBlockId = 'block-2';
-    component.addSelectedBlock(component.createForm);
+    component.openAddBlockDialog(component.createForm);
+    component.addExistingBlock(component.blocks()[0]);
+    component.addExistingBlock(component.blocks()[1]);
     component.moveBlockUp(component.createForm, 1);
     await component.createWorkout();
     fixture.detectChanges();
 
     expect(api.created[0]).toEqual({ name: 'Treino', blockIds: ['block-2', 'block-1'] });
-    expect(component.createForm).toEqual({ name: '', selectedBlockId: '', blocks: [] });
+    expect(component.createForm).toEqual({ name: '', blocks: [] });
     expect(fixture.nativeElement.textContent).toContain('Treino cadastrado com sucesso.');
+    expect(component.postSaveDialogOpen).toBe(true);
   });
 
-  it('prevents creation when there are no active blocks', async () => {
-    const { fixture, component } = await renderPage([], [block({ active: false })]);
+  it('opens builder and offers contextual block creation when there are no active blocks', async () => {
+    const { component } = await renderPage([], [block({ active: false })]);
 
     component.openCreateDialog();
-    fixture.detectChanges();
+    component.openAddBlockDialog(component.createForm);
 
-    expect(component.createDialogOpen).toBe(false);
-    expect(fixture.nativeElement.textContent).toContain('Cadastre ou ative pelo menos um bloco antes de criar um treino.');
+    expect(component.createDialogOpen).toBe(true);
+    expect(component.addBlockDialogOpen).toBe(true);
+    expect(component.filteredAvailableBlocks()).toEqual([]);
+    expect(component.hasActiveBlocks()).toBe(false);
   });
 
   it('prevents duplicate selection and removes blocks', async () => {
     const { component } = await renderPage([], [block({ id: 'block-1' })]);
 
     component.openCreateDialog();
-    component.createForm.selectedBlockId = 'block-1';
-    component.addSelectedBlock(component.createForm);
-    component.createForm.selectedBlockId = 'block-1';
-    component.addSelectedBlock(component.createForm);
+    component.openAddBlockDialog(component.createForm);
+    component.addExistingBlock(component.blocks()[0]);
+    component.addExistingBlock(component.blocks()[0]);
 
     expect(component.createForm.blocks).toHaveLength(1);
     expect(component.availableBlocks(component.createForm)).toHaveLength(0);
@@ -124,8 +127,8 @@ describe('WorkoutsPage', () => {
 
     component.openCreateDialog();
     component.createForm.name = 'Treino';
-    component.createForm.selectedBlockId = 'block-id';
-    component.addSelectedBlock(component.createForm);
+    component.openAddBlockDialog(component.createForm);
+    component.addExistingBlock(component.blocks()[0]);
     await component.createWorkout();
     fixture.detectChanges();
 
@@ -189,16 +192,145 @@ describe('WorkoutsPage', () => {
     component.createForm.name = 'Temporário';
     component.createForm.blocks = [workoutBlock()];
     component.closeCreateDialog();
-    expect(component.createForm).toEqual({ name: '', selectedBlockId: '', blocks: [] });
+    expect(component.createForm).toEqual({ name: '', blocks: [] });
 
     await component.openEditDialog(original);
     component.editForm.name = 'Temporário';
     component.closeEditDialog();
-    expect(component.editForm).toEqual({ name: '', selectedBlockId: '', blocks: [] });
+    expect(component.editForm).toEqual({ name: '', blocks: [] });
+  });
+
+  it('filters existing blocks by name and category in the add-block flow', async () => {
+    const { component } = await renderPage([], [
+      block({ id: 'block-1', name: 'Jab', category: { id: 'cat-1', name: 'Técnica' } }),
+      block({ id: 'block-2', name: 'Corrida', category: { id: 'cat-2', name: 'Condicionamento' } }),
+    ]);
+
+    component.openCreateDialog();
+    component.openAddBlockDialog(component.createForm);
+    component.blockSearch = 'cond';
+
+    expect(component.filteredAvailableBlocks().map((item: Block) => item.id)).toEqual(['block-2']);
+
+    component.blockSearch = 'jab';
+    expect(component.filteredAvailableBlocks().map((item: Block) => item.id)).toEqual(['block-1']);
+  });
+
+  it('creates a block in context and preserves the workout draft', async () => {
+    const blockApi = new FakeBlockApi([block()]);
+    const { fixture, component } = await renderPage([], [], new FakeWorkoutApi([]), [category()], blockApi);
+
+    component.openCreateDialog();
+    component.createForm.name = 'Treino em construção';
+    component.openAddBlockDialog(component.createForm);
+    component.showCreateBlock();
+    component.blockCreateForm = { name: 'Jab + direto', categoryId: 'category-id' };
+    await component.createBlockInBuilder();
+    fixture.detectChanges();
+
+    expect(blockApi.created[0]).toEqual({ name: 'Jab + direto', categoryId: 'category-id' });
+    expect(component.createForm.name).toBe('Treino em construção');
+    expect(component.createForm.blocks.map((item: WorkoutBlock) => item.name)).toEqual(['Jab + direto']);
+    expect(component.addBlockDialogOpen).toBe(false);
+    expect(fixture.nativeElement.textContent).toContain('Bloco criado e adicionado ao treino.');
+  });
+
+  it('creates a category in context and preserves block and workout drafts', async () => {
+    const categoryApi = new FakeCategoryApi([]);
+    const { fixture, component } = await renderPage([], [], new FakeWorkoutApi([]), [], new FakeBlockApi([]), categoryApi);
+
+    component.openCreateDialog();
+    component.createForm.name = 'Treino';
+    component.openAddBlockDialog(component.createForm);
+    component.showCreateBlock();
+    component.blockCreateForm.name = 'Defesa';
+    component.openCategoryDialog();
+    component.categoryCreateForm.name = 'Técnica';
+    await component.createCategoryInBuilder();
+    fixture.detectChanges();
+
+    expect(categoryApi.created).toEqual([{ name: 'Técnica' }]);
+    expect(component.createForm.name).toBe('Treino');
+    expect(component.blockCreateForm.name).toBe('Defesa');
+    expect(component.blockCreateForm.categoryId).toBe('category-1');
+    expect(component.categoryDialogOpen).toBe(false);
+    expect(fixture.nativeElement.textContent).toContain('Categoria criada.');
+  });
+
+  it('keeps drafts after category, block, and workout conflicts', async () => {
+    const api = new FakeWorkoutApi([]);
+    api.createError = new HttpErrorResponse({ status: 409, statusText: 'Conflict' });
+    const blockApi = new FakeBlockApi([block()]);
+    blockApi.createError = new HttpErrorResponse({ status: 409, statusText: 'Conflict' });
+    const categoryApi = new FakeCategoryApi([]);
+    categoryApi.createError = new HttpErrorResponse({ status: 409, statusText: 'Conflict' });
+    const { fixture, component } = await renderPage([], [block()], api, [category()], blockApi, categoryApi);
+
+    component.openCreateDialog();
+    component.createForm.name = 'Treino';
+    component.openAddBlockDialog(component.createForm);
+    component.showCreateBlock();
+    component.blockCreateForm = { name: 'Jab', categoryId: 'category-id' };
+    component.openCategoryDialog();
+    component.categoryCreateForm.name = 'Técnica';
+    await component.createCategoryInBuilder();
+    expect(component.categoryErrorMessage()).toBe('Já existe uma categoria com este nome.');
+
+    await component.createBlockInBuilder();
+    expect(component.addBlockErrorMessage()).toBe('Já existe um bloco com este nome nesta categoria.');
+
+    component.showBlockSelection();
+    component.addExistingBlock(component.blocks()[0]);
+    await component.createWorkout();
+    fixture.detectChanges();
+
+    expect(component.createForm.name).toBe('Treino');
+    expect(component.createForm.blocks).toHaveLength(1);
+    expect(component.blockCreateForm).toEqual({ name: 'Jab', categoryId: 'category-id' });
+    expect(component.categoryCreateForm.name).toBe('Técnica');
+    expect(fixture.nativeElement.textContent).toContain('Já existe um treino com este nome.');
+  });
+
+  it('shows no-categories path inside contextual block creation', async () => {
+    const { component } = await renderPage([], [], new FakeWorkoutApi([]), []);
+
+    component.openCreateDialog();
+    component.openAddBlockDialog(component.createForm);
+    component.showCreateBlock();
+
+    expect(component.hasActiveCategories()).toBe(false);
+    expect(component.addBlockMode).toBe('create');
+    expect(component.blockFormValid()).toBe(false);
+  });
+
+  it('schedules newly created workout without reselecting it', async () => {
+    const scheduleApi = new FakeScheduleApi();
+    const api = new FakeWorkoutApi([]);
+    const { component } = await renderPage([], [block()], api, [category()], new FakeBlockApi([block()]), new FakeCategoryApi([category()]), scheduleApi);
+
+    component.openCreateDialog();
+    component.createForm.name = 'Treino';
+    component.openAddBlockDialog(component.createForm);
+    component.addExistingBlock(component.blocks()[0]);
+    await component.createWorkout();
+    component.scheduleForm.scheduledDate = '2026-08-24';
+    await component.scheduleCreatedWorkout();
+
+    expect(scheduleApi.created).toEqual([{ workoutId: 'workout-1', scheduledDate: '2026-08-24' }]);
+    expect(component.postSaveDialogOpen).toBe(false);
+    expect(component.successMessage()).toBe('Treino agendado com sucesso.');
   });
 });
 
-async function renderPage(workouts: WorkoutListItem[], blocks: Block[], api = new FakeWorkoutApi(workouts)) {
+async function renderPage(
+  workouts: WorkoutListItem[],
+  blocks: Block[],
+  api = new FakeWorkoutApi(workouts),
+  categories = [category()],
+  blockApi = new FakeBlockApi(blocks),
+  categoryApi = new FakeCategoryApi(categories),
+  scheduleApi = new FakeScheduleApi(),
+) {
   TestBed.resetTestingModule();
 
   await TestBed.configureTestingModule({
@@ -206,7 +338,9 @@ async function renderPage(workouts: WorkoutListItem[], blocks: Block[], api = ne
     providers: [
       provideRouter([]),
       { provide: WorkoutApiService, useValue: api },
-      { provide: BlockApiService, useValue: new FakeBlockApi(blocks) },
+      { provide: BlockApiService, useValue: blockApi },
+      { provide: CategoryApiService, useValue: categoryApi },
+      { provide: ScheduleApiService, useValue: scheduleApi },
     ],
   }).compileComponents();
 
@@ -217,7 +351,7 @@ async function renderPage(workouts: WorkoutListItem[], blocks: Block[], api = ne
   await component.loadData();
   fixture.detectChanges();
 
-  return { fixture, component, api };
+  return { fixture, component, api, blockApi, categoryApi, scheduleApi };
 }
 
 function workout(overrides: Partial<WorkoutListItem> = {}): WorkoutListItem {
@@ -261,6 +395,17 @@ function block(overrides: Partial<Block> = {}): Block {
     name: 'Bloco',
     active: true,
     category: { id: 'category-id', name: 'Categoria' },
+    createdAt: '2026-08-23T00:00:00Z',
+    updatedAt: '2026-08-23T00:00:00Z',
+    ...overrides,
+  };
+}
+
+function category(overrides: Partial<Category> = {}): Category {
+  return {
+    id: 'category-id',
+    name: 'Categoria',
+    active: true,
     createdAt: '2026-08-23T00:00:00Z',
     updatedAt: '2026-08-23T00:00:00Z',
     ...overrides,
@@ -331,9 +476,59 @@ class FakeWorkoutApi {
 }
 
 class FakeBlockApi {
+  created: Array<{ name: string; categoryId: string }> = [];
+  createError: unknown = null;
+
   constructor(private blocks: Block[]) {}
 
   async list(): Promise<Block[]> {
     return this.blocks;
+  }
+
+  async create(request: { name: string; categoryId: string }): Promise<Block> {
+    this.created.push(request);
+    if (this.createError) {
+      throw this.createError;
+    }
+
+    const categoryName = request.categoryId === 'category-id' ? 'Categoria' : 'Técnica';
+    const created = block({
+      id: `block-${this.created.length}`,
+      name: request.name,
+      category: { id: request.categoryId, name: categoryName },
+    });
+    this.blocks = [...this.blocks, created];
+    return created;
+  }
+}
+
+class FakeCategoryApi {
+  created: Array<{ name: string }> = [];
+  createError: unknown = null;
+
+  constructor(private categories: Category[]) {}
+
+  async list(): Promise<Category[]> {
+    return this.categories;
+  }
+
+  async create(request: { name: string }): Promise<Category> {
+    this.created.push(request);
+    if (this.createError) {
+      throw this.createError;
+    }
+
+    const created = category({ id: `category-${this.created.length}`, name: request.name });
+    this.categories = [...this.categories, created];
+    return created;
+  }
+}
+
+class FakeScheduleApi {
+  created: Array<{ workoutId: string; scheduledDate: string }> = [];
+
+  async create(request: { workoutId: string; scheduledDate: string }): Promise<unknown> {
+    this.created.push(request);
+    return {};
   }
 }

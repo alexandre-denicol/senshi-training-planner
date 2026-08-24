@@ -68,26 +68,31 @@
 
             <div class="entry-list">
               @for (entry of group.entries; track entry.id) {
-                <article class="entry-card">
-                  <div>
-                    <h3>{{ entry.workout.name }}</h3>
-                    @if (isCompleted(entry)) {
-                      <span class="status-badge">Realizado</span>
-                    }
-                    @if (!entry.workout.active) {
-                      <span class="inline-badge">Inativo</span>
-                    }
+                <article class="entry-card" [class.completed-entry]="isCompleted(entry)">
+                  <div class="entry-main">
+                    <div class="entry-title-row">
+                      <h3>{{ entry.workout.name }}</h3>
+                      @if (isCompleted(entry)) {
+                        <span class="status-badge">Realizado</span>
+                      } @else {
+                        <span class="status-badge scheduled">Agendado</span>
+                      }
+                      @if (!entry.workout.active) {
+                        <span class="inline-badge">Inativo</span>
+                      }
+                    </div>
+                    <p>{{ formatDate(entry.scheduledDate) }}</p>
                   </div>
 
                   @if (!isCompleted(entry)) {
                     <div class="row-actions">
+                      <button pButton type="button" class="complete-action" [disabled]="rowActionId() === entry.id" (click)="confirmComplete(entry)">
+                        <i class="pi pi-check-circle" aria-hidden="true"></i>
+                        <span>Realizar treino</span>
+                      </button>
                       <button pButton type="button" class="detail-action" [disabled]="workoutDetailLoadingEntryId() === entry.id" (click)="openWorkoutDetail(entry)">
                         <i class="pi pi-eye" aria-hidden="true"></i>
                         <span>Ver treino</span>
-                      </button>
-                      <button pButton type="button" class="complete-action" [disabled]="rowActionId() === entry.id" (click)="confirmComplete(entry)">
-                        <i class="pi pi-check-circle" aria-hidden="true"></i>
-                        <span>Marcar como realizado</span>
                       </button>
                       @if (canManageSchedule()) {
                         <button

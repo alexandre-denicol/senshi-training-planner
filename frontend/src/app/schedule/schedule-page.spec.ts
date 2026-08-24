@@ -38,7 +38,7 @@ describe('SchedulePage', () => {
     expect(text).toContain('Treino Base');
     expect(text).toContain('Agendar treino');
     expect(text).toContain('Ver treino');
-    expect(text).toContain('Marcar como realizado');
+    expect(text).toContain('Realizar treino');
     expect(fixture.nativeElement.querySelector('button[aria-label="Editar agendamento"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('button[aria-label="Remover agendamento"]')).toBeTruthy();
     expect(workoutApi.listCalls).toBeGreaterThan(0);

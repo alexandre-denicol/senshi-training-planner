@@ -1,0 +1,190 @@
+<section class="dashboard-page" aria-labelledby="dashboard-title">
+  <header class="dashboard-hero">
+    <div>
+      <h1 id="dashboard-title">Olá, {{ userName() }}</h1>
+      <p>Bem-vindo ao Senshi Passo de Torres</p>
+    </div>
+  </header>
+
+  @if (errorMessage()) {
+    <p class="feedback error" role="alert">{{ errorMessage() }}</p>
+  }
+
+  @if (loading()) {
+    <div class="loading-state" role="status" aria-label="Carregando dashboard">
+      <span class="loading-indicator" aria-hidden="true"></span>
+    </div>
+  } @else {
+    <div class="summary-grid">
+      @for (card of summaryCards(); track card.label) {
+        <a class="summary-card" [routerLink]="card.link">
+          <span class="summary-icon">
+            <i [class]="card.icon" aria-hidden="true"></i>
+          </span>
+          <span>
+            <span class="summary-label">{{ card.label }}</span>
+            <strong>{{ card.value }}</strong>
+          </span>
+          <span class="summary-action">{{ card.action }} <i class="pi pi-arrow-right" aria-hidden="true"></i></span>
+        </a>
+      }
+    </div>
+
+    <div class="dashboard-columns">
+      <section class="dashboard-panel" aria-labelledby="upcoming-title">
+        <header>
+          <div class="panel-title">
+            <i class="pi pi-calendar" aria-hidden="true"></i>
+            <h2 id="upcoming-title">Próximos treinos</h2>
+          </div>
+          <a routerLink="/app/agenda">Ver agenda completa <i class="pi pi-arrow-right" aria-hidden="true"></i></a>
+        </header>
+
+        @if (upcomingEntries().length === 0) {
+          <div class="panel-empty">
+            <p>Nenhum treino agendado.</p>
+            <a routerLink="/app/agenda">Abrir agenda</a>
+          </div>
+        } @else {
+          <div class="dashboard-list">
+            @for (entry of upcomingEntries(); track entry.id) {
+              <button type="button" class="dashboard-row" (click)="openWorkoutDetail(entry)">
+                <span class="date-chip">
+                  <small>{{ formatMonth(entry.scheduledDate) }}</small>
+                  <strong>{{ formatDay(entry.scheduledDate) }}</strong>
+                </span>
+                <span class="row-main">
+                  <strong>{{ entry.workout.name }}</strong>
+                  <small>{{ formatDate(entry.scheduledDate) }}</small>
+                </span>
+                <i class="pi pi-chevron-right" aria-hidden="true"></i>
+              </button>
+            }
+          </div>
+        }
+      </section>
+
+      <section class="dashboard-panel" aria-labelledby="history-title">
+        <header>
+          <div class="panel-title">
+            <i class="pi pi-history" aria-hidden="true"></i>
+            <h2 id="history-title">Últimos treinos realizados</h2>
+          </div>
+          <a routerLink="/app/historico">Ver histórico <i class="pi pi-arrow-right" aria-hidden="true"></i></a>
+        </header>
+
+        @if (recentHistory().length === 0) {
+          <div class="panel-empty">
+            <p>Nenhum treino realizado neste período.</p>
+            <a routerLink="/app/historico">Abrir histórico</a>
+          </div>
+        } @else {
+          <div class="dashboard-list">
+            @for (item of recentHistory(); track item.id) {
+              <button type="button" class="dashboard-row history-row" (click)="openHistoryDetail(item)">
+                <span class="done-icon">
+                  <i class="pi pi-check" aria-hidden="true"></i>
+                </span>
+                <span class="row-main">
+                  <strong>{{ item.workoutName }}</strong>
+                  <small>{{ formatDate(item.trainingDate) }} · {{ participantCountLabel(item.participantCount) }}</small>
+                </span>
+                <i class="pi pi-chevron-right" aria-hidden="true"></i>
+              </button>
+            }
+          </div>
+        }
+      </section>
+    </div>
+  }
+</section>
+
+<p-dialog
+  header="Detalhes do treino"
+  [(visible)]="workoutDetailDialogOpen"
+  [modal]="true"
+  [draggable]="false"
+  [resizable]="false"
+  styleClass="dashboard-dialog"
+  (onHide)="closeWorkoutDetail()"
+>
+  <div class="detail-body">
+    @if (selectedScheduleEntry; as entry) {
+      <div class="detail-summary">
+        <h2>{{ workoutDetail()?.name ?? entry.workout.name }}</h2>
+        <p>{{ formatDate(entry.scheduledDate) }}</p>
+      </div>
+    }
+
+    @if (workoutDetailLoading()) {
+      <div class="detail-loading" role="status" aria-label="Carregando detalhes do treino">
+        <span class="loading-indicator" aria-hidden="true"></span>
+      </div>
+    } @else if (workoutDetailError()) {
+      <p class="dialog-error" role="alert">{{ workoutDetailError() }}</p>
+    } @else if (workoutDetail(); as workout) {
+      <ol class="detail-list">
+        @for (block of workout.blocks; track block.id) {
+          <li>
+            <span class="block-position">{{ block.position }}</span>
+            <span>
+              <strong>{{ block.name }}</strong>
+              <small>{{ block.category.name }}</small>
+              @if (!block.active) {
+                <em>Bloco inativo</em>
+              }
+            </span>
+          </li>
+        }
+      </ol>
+    }
+  </div>
+  <footer class="dialog-actions">
+    <button pButton type="button" class="secondary-action" (click)="closeWorkoutDetail()">Fechar</button>
+  </footer>
+</p-dialog>
+
+<p-dialog
+  header="Histórico do treino"
+  [(visible)]="historyDetailDialogOpen"
+  [modal]="true"
+  [draggable]="false"
+  [resizable]="false"
+  styleClass="dashboard-dialog"
+  (onHide)="closeHistoryDetail()"
+>
+  <div class="detail-body">
+    @if (historyDetailLoading()) {
+      <div class="detail-loading" role="status" aria-label="Carregando histórico">
+        <span class="loading-indicator" aria-hidden="true"></span>
+      </div>
+    } @else if (historyDetailError()) {
+      <p class="dialog-error" role="alert">{{ historyDetailError() }}</p>
+    } @else if (historyDetail(); as detail) {
+      <div class="detail-summary">
+        <h2>{{ detail.workoutName }}</h2>
+        <p>{{ formatDate(detail.trainingDate) }} · {{ participantCountLabel(detail.participantCount) }}</p>
+      </div>
+      <ol class="detail-list">
+        @for (block of detail.blocks; track block.position) {
+          <li>
+            <span class="block-position">{{ block.position }}</span>
+            <span>
+              <strong>{{ block.blockName }}</strong>
+              <small>{{ block.categoryName }}</small>
+            </span>
+          </li>
+        }
+      </ol>
+      @if (detail.notes) {
+        <div class="detail-notes">
+          <strong>Observações</strong>
+          <p>{{ detail.notes }}</p>
+        </div>
+      }
+    }
+  </div>
+  <footer class="dialog-actions">
+    <button pButton type="button" class="secondary-action" (click)="closeHistoryDetail()">Fechar</button>
+  </footer>
+</p-dialog>
