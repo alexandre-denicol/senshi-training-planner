@@ -57,6 +57,12 @@ func TestServiceCompleteSnapshotsScheduleAndUserData(t *testing.T) {
 	if detail.WorkoutName != "Treino Snapshot" || detail.Blocks[0].BlockName != "Bloco A" || detail.Blocks[0].CategoryName != "Categoria A" {
 		t.Fatalf("expected snapshot values in detail, got %#v", detail)
 	}
+	if detail.Blocks[0].Description == nil || *detail.Blocks[0].Description != "Descrição snapshot" {
+		t.Fatalf("expected block description snapshot, got %#v", detail.Blocks[0].Description)
+	}
+	if len(detail.Blocks[0].Sequence) != 2 || detail.Blocks[0].Sequence[0].Text != "Jab" || detail.Blocks[0].Sequence[1].Text != "Direto" {
+		t.Fatalf("expected ordered block sequence snapshot, got %#v", detail.Blocks[0].Sequence)
+	}
 }
 
 func TestServiceCompleteParticipantDetailsValidation(t *testing.T) {
@@ -232,8 +238,17 @@ func detailFixture() Detail {
 		CompletedAt:      time.Date(2026, 8, 23, 15, 32, 0, 0, time.UTC),
 		ParticipantNames: []string{},
 		Blocks: []Block{
-			{Position: 1, BlockName: "Bloco A", CategoryName: "Categoria A"},
-			{Position: 2, BlockName: "Bloco B", CategoryName: "Categoria B"},
+			{
+				Position:     1,
+				BlockName:    "Bloco A",
+				CategoryName: "Categoria A",
+				Description:  stringPtr("Descrição snapshot"),
+				Sequence: []SequenceItem{
+					{Position: 1, Text: "Jab"},
+					{Position: 2, Text: "Direto"},
+				},
+			},
+			{Position: 2, BlockName: "Bloco B", CategoryName: "Categoria B", Sequence: []SequenceItem{}},
 		},
 	}
 }

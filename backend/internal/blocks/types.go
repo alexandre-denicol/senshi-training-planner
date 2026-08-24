@@ -7,6 +7,9 @@ import (
 )
 
 const MaxNameRunes = 120
+const MaxDescriptionRunes = 2000
+const MaxSequenceItems = 40
+const MaxSequenceTextRunes = 160
 
 var (
 	ErrInvalidRequest  = errors.New("invalid request")
@@ -22,22 +25,33 @@ type CategoryRef struct {
 }
 
 type Block struct {
-	ID        string      `json:"id"`
-	Name      string      `json:"name"`
-	Active    bool        `json:"active"`
-	Category  CategoryRef `json:"category"`
-	CreatedAt time.Time   `json:"createdAt"`
-	UpdatedAt time.Time   `json:"updatedAt"`
+	ID          string         `json:"id"`
+	Name        string         `json:"name"`
+	Description *string        `json:"description"`
+	Sequence    []SequenceItem `json:"sequence"`
+	Active      bool           `json:"active"`
+	Category    CategoryRef    `json:"category"`
+	CreatedAt   time.Time      `json:"createdAt"`
+	UpdatedAt   time.Time      `json:"updatedAt"`
+}
+
+type SequenceItem struct {
+	Position int    `json:"position"`
+	Text     string `json:"text"`
 }
 
 type CreateInput struct {
-	Name       string `json:"name"`
-	CategoryID string `json:"categoryId"`
+	Name        string              `json:"name"`
+	CategoryID  string              `json:"categoryId"`
+	Description *string             `json:"description"`
+	Sequence    []SequenceItemInput `json:"sequence"`
 }
 
 type UpdateInput struct {
-	Name       string `json:"name"`
-	CategoryID string `json:"categoryId"`
+	Name        string              `json:"name"`
+	CategoryID  string              `json:"categoryId"`
+	Description *string             `json:"description"`
+	Sequence    []SequenceItemInput `json:"sequence"`
 }
 
 type StatusInput struct {
@@ -45,15 +59,26 @@ type StatusInput struct {
 }
 
 type NewBlock struct {
-	ID         string
-	Name       string
-	CategoryID string
+	ID          string
+	Name        string
+	CategoryID  string
+	Description *string
+	Sequence    []NewSequenceItem
+}
+
+type SequenceItemInput struct {
+	Text string `json:"text"`
+}
+
+type NewSequenceItem struct {
+	Position int
+	Text     string
 }
 
 type Store interface {
 	ListBlocks(ctx context.Context) ([]Block, error)
 	CreateBlock(ctx context.Context, block NewBlock) (Block, error)
-	UpdateBlock(ctx context.Context, id string, name string, categoryID string) (Block, error)
+	UpdateBlock(ctx context.Context, id string, name string, categoryID string, description *string, sequence []NewSequenceItem) (Block, error)
 	SetBlockStatus(ctx context.Context, id string, active bool) (Block, error)
 	DeleteBlock(ctx context.Context, id string) error
 }

@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { BlockCategory } from '../blocks/block-api.service';
+import { BlockCategory, BlockSequenceItem } from '../blocks/block-api.service';
 
 export interface WorkoutListItem {
   id: string;
@@ -15,6 +15,8 @@ export interface WorkoutListItem {
 export interface WorkoutBlock {
   id: string;
   name: string;
+  description: string | null;
+  sequence: BlockSequenceItem[];
   active: boolean;
   position: number;
   category: BlockCategory;

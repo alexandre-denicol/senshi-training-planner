@@ -46,9 +46,16 @@ type Detail struct {
 }
 
 type Block struct {
-	Position     int    `json:"position"`
-	BlockName    string `json:"blockName"`
-	CategoryName string `json:"categoryName"`
+	Position     int            `json:"position"`
+	BlockName    string         `json:"blockName"`
+	CategoryName string         `json:"categoryName"`
+	Description  *string        `json:"description"`
+	Sequence     []SequenceItem `json:"sequence"`
+}
+
+type SequenceItem struct {
+	Position int    `json:"position"`
+	Text     string `json:"text"`
 }
 
 type Store interface {

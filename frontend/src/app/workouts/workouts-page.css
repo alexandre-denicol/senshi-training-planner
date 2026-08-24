@@ -23,9 +23,17 @@ h1 {
 .selected-block p,
 .builder-heading p,
 .block-option p,
-.post-save-summary p {
+.post-save-summary p,
+.sequence-preview {
   color: #aebacc;
   margin: 0.35rem 0 0;
+}
+
+.sequence-preview {
+  display: block;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .primary-action,
@@ -233,7 +241,8 @@ dd {
 }
 
 .dialog-form input,
-.dialog-form select {
+.dialog-form select,
+.dialog-form textarea {
   background: #111418;
   border: 1px solid #343a45;
   border-radius: 6px;
@@ -241,6 +250,11 @@ dd {
   min-height: 2.6rem;
   padding: 0.65rem 0.75rem;
   width: 100%;
+}
+
+.dialog-form textarea {
+  line-height: 1.5;
+  resize: vertical;
 }
 
 .builder-heading,
@@ -316,6 +330,65 @@ dd {
   padding: 0.85rem;
 }
 
+.sequence-editor {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.sequence-editor > span {
+  color: #dbe5f3;
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+
+.sequence-add-row {
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: 1fr auto;
+}
+
+.sequence-list {
+  display: grid;
+  gap: 0.45rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sequence-list li {
+  align-items: center;
+  background: #111418;
+  border: 1px solid #2a3039;
+  border-radius: 6px;
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: auto 1fr auto;
+  padding: 0.55rem;
+}
+
+.sequence-position {
+  align-items: center;
+  background: rgba(94, 234, 212, 0.1);
+  border: 1px solid rgba(94, 234, 212, 0.25);
+  color: #9ff5e8;
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 800;
+  height: 1.55rem;
+  justify-content: center;
+  width: 1.55rem;
+}
+
+.sequence-text {
+  color: #e2e8f0;
+  overflow-wrap: anywhere;
+}
+
+.sequence-actions {
+  display: flex;
+  gap: 0.35rem;
+}
+
 .post-save-summary {
   background: #14171c;
   border: 1px solid #2a3039;
@@ -359,7 +432,8 @@ dd {
 
 button:focus-visible,
 input:focus-visible,
-select:focus-visible {
+select:focus-visible,
+textarea:focus-visible {
   outline: 2px solid #5eead4;
   outline-offset: 2px;
 }
@@ -388,6 +462,7 @@ select:focus-visible {
   .builder-heading,
   .category-picker,
   .block-option,
+  .sequence-add-row,
   .selected-block {
     display: grid;
     grid-template-columns: 1fr;
@@ -396,7 +471,8 @@ select:focus-visible {
   .primary-action,
   .add-block-action,
   .block-option button,
-  .category-picker button {
+  .category-picker button,
+  .sequence-add-row button {
     justify-content: center;
     width: 100%;
   }
@@ -410,8 +486,18 @@ select:focus-visible {
   }
 
   .card-actions,
-  .selected-actions {
+  .selected-actions,
+  .sequence-actions {
     justify-content: flex-start;
+  }
+
+  .sequence-list li {
+    align-items: start;
+    grid-template-columns: auto 1fr;
+  }
+
+  .sequence-actions {
+    grid-column: 1 / -1;
   }
 
   .dialog-form {

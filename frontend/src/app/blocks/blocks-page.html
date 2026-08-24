@@ -187,6 +187,8 @@
       </select>
     </label>
 
+    <ng-container *ngTemplateOutlet="blockContentEditor; context: { form: createForm, prefix: 'create' }"></ng-container>
+
     <footer class="dialog-actions">
       <button pButton type="button" class="secondary-action" (click)="closeCreateDialog()" [disabled]="submitting()">
         Cancelar
@@ -234,6 +236,8 @@
       <p class="form-hint">Selecione uma categoria ativa para salvar alterações.</p>
     }
 
+    <ng-container *ngTemplateOutlet="blockContentEditor; context: { form: editForm, prefix: 'edit' }"></ng-container>
+
     <footer class="dialog-actions">
       <button pButton type="button" class="secondary-action" (click)="closeEditDialog()" [disabled]="submitting()">
         Cancelar
@@ -244,6 +248,64 @@
     </footer>
   </form>
 </p-dialog>
+
+<ng-template #blockContentEditor let-form="form" let-prefix="prefix">
+  <label>
+    <span>Descrição / instruções (opcional)</span>
+    <textarea
+      [name]="prefix + '-block-description'"
+      rows="5"
+      autocomplete="off"
+      [(ngModel)]="form.description"
+    ></textarea>
+  </label>
+
+  <section class="sequence-editor" aria-label="Sequência opcional">
+    <div>
+      <h2>Sequência (opcional)</h2>
+      <p>Itens livres, na ordem em que devem aparecer no bloco.</p>
+    </div>
+
+    <div class="sequence-add-row">
+      <input
+        #sequenceInput
+        pInputText
+        type="text"
+        [name]="prefix + '-block-sequence-item'"
+        autocomplete="off"
+        aria-label="Item da sequência"
+        [(ngModel)]="form.sequenceText"
+        (keydown.enter)="addSequenceItemFromKeyboard($event, form, sequenceInput)"
+      />
+      <button pButton type="button" class="secondary-action" (click)="addSequenceItem(form, sequenceInput)" [disabled]="form.sequenceText.trim() === ''">
+        <i class="pi pi-plus" aria-hidden="true"></i>
+        <span>Adicionar</span>
+      </button>
+    </div>
+
+    @if (form.sequence.length > 0) {
+      <ol class="sequence-list">
+        @for (item of form.sequence; track $index; let index = $index; let first = $first; let last = $last) {
+          <li>
+            <span class="sequence-position">{{ index + 1 }}.</span>
+            <span class="sequence-text">{{ item }}</span>
+            <div class="sequence-actions">
+              <button pButton type="button" class="icon-action" aria-label="Mover item para cima" title="Mover para cima" [disabled]="first" (click)="moveSequenceItemUp(form, index)">
+                <i class="pi pi-arrow-up" aria-hidden="true"></i>
+              </button>
+              <button pButton type="button" class="icon-action" aria-label="Mover item para baixo" title="Mover para baixo" [disabled]="last" (click)="moveSequenceItemDown(form, index)">
+                <i class="pi pi-arrow-down" aria-hidden="true"></i>
+              </button>
+              <button pButton type="button" class="icon-action danger" aria-label="Remover item" title="Remover" (click)="removeSequenceItem(form, index)">
+                <i class="pi pi-times" aria-hidden="true"></i>
+              </button>
+            </div>
+          </li>
+        }
+      </ol>
+    }
+  </section>
+</ng-template>
 
 <p-dialog
   [header]="confirmationTitle()"

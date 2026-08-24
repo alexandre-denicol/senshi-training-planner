@@ -201,13 +201,24 @@ describe('WorkoutsPage', () => {
   });
 
   it('filters existing blocks by name and category in the add-block flow', async () => {
-    const { component } = await renderPage([], [
-      block({ id: 'block-1', name: 'Jab', category: { id: 'cat-1', name: 'Técnica' } }),
+    const { fixture, component } = await renderPage([], [
+      block({
+        id: 'block-1',
+        name: 'Jab',
+        sequence: [
+          { position: 1, text: 'Jab' },
+          { position: 2, text: 'Direto' },
+        ],
+        category: { id: 'cat-1', name: 'Técnica' },
+      }),
       block({ id: 'block-2', name: 'Corrida', category: { id: 'cat-2', name: 'Condicionamento' } }),
     ]);
 
     component.openCreateDialog();
     component.openAddBlockDialog(component.createForm);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Jab → Direto');
+
     component.blockSearch = 'cond';
 
     expect(component.filteredAvailableBlocks().map((item: Block) => item.id)).toEqual(['block-2']);
@@ -224,11 +235,11 @@ describe('WorkoutsPage', () => {
     component.createForm.name = 'Treino em construção';
     component.openAddBlockDialog(component.createForm);
     component.showCreateBlock();
-    component.blockCreateForm = { name: 'Jab + direto', categoryId: 'category-id' };
+    component.blockCreateForm = { name: 'Jab + direto', categoryId: 'category-id', description: 'Sequência em dupla', sequence: ['Jab', 'Direto'], sequenceText: '' };
     await component.createBlockInBuilder();
     fixture.detectChanges();
 
-    expect(blockApi.created[0]).toEqual({ name: 'Jab + direto', categoryId: 'category-id' });
+    expect(blockApi.created[0]).toEqual({ name: 'Jab + direto', categoryId: 'category-id', description: 'Sequência em dupla', sequence: [{ text: 'Jab' }, { text: 'Direto' }] });
     expect(component.createForm.name).toBe('Treino em construção');
     expect(component.createForm.blocks.map((item: WorkoutBlock) => item.name)).toEqual(['Jab + direto']);
     expect(component.addBlockDialogOpen).toBe(false);
@@ -270,7 +281,7 @@ describe('WorkoutsPage', () => {
     component.createForm.name = 'Treino';
     component.openAddBlockDialog(component.createForm);
     component.showCreateBlock();
-    component.blockCreateForm = { name: 'Jab', categoryId: 'category-id' };
+    component.blockCreateForm = { name: 'Jab', categoryId: 'category-id', description: '', sequence: [], sequenceText: '' };
     component.openCategoryDialog();
     component.categoryCreateForm.name = 'Técnica';
     await component.createCategoryInBuilder();
@@ -286,7 +297,7 @@ describe('WorkoutsPage', () => {
 
     expect(component.createForm.name).toBe('Treino');
     expect(component.createForm.blocks).toHaveLength(1);
-    expect(component.blockCreateForm).toEqual({ name: 'Jab', categoryId: 'category-id' });
+    expect(component.blockCreateForm).toEqual({ name: 'Jab', categoryId: 'category-id', description: '', sequence: [], sequenceText: '' });
     expect(component.categoryCreateForm.name).toBe('Técnica');
     expect(fixture.nativeElement.textContent).toContain('Já existe um treino com este nome.');
   });
@@ -382,6 +393,8 @@ function workoutBlock(overrides: Partial<WorkoutDetail['blocks'][number]> = {}):
   return {
     id: 'block-id',
     name: 'Bloco',
+    description: null,
+    sequence: [],
     active: true,
     position: 1,
     category: { id: 'category-id', name: 'Categoria' },
@@ -393,6 +406,8 @@ function block(overrides: Partial<Block> = {}): Block {
   return {
     id: 'block-id',
     name: 'Bloco',
+    description: null,
+    sequence: [],
     active: true,
     category: { id: 'category-id', name: 'Categoria' },
     createdAt: '2026-08-23T00:00:00Z',
@@ -476,7 +491,7 @@ class FakeWorkoutApi {
 }
 
 class FakeBlockApi {
-  created: Array<{ name: string; categoryId: string }> = [];
+  created: Array<{ name: string; categoryId: string; description?: string | null; sequence?: Array<{ text: string }> }> = [];
   createError: unknown = null;
 
   constructor(private blocks: Block[]) {}
@@ -485,7 +500,7 @@ class FakeBlockApi {
     return this.blocks;
   }
 
-  async create(request: { name: string; categoryId: string }): Promise<Block> {
+  async create(request: { name: string; categoryId: string; description?: string | null; sequence?: Array<{ text: string }> }): Promise<Block> {
     this.created.push(request);
     if (this.createError) {
       throw this.createError;
@@ -495,6 +510,8 @@ class FakeBlockApi {
     const created = block({
       id: `block-${this.created.length}`,
       name: request.name,
+      description: request.description ?? null,
+      sequence: (request.sequence ?? []).map((item, index) => ({ position: index + 1, text: item.text })),
       category: { id: request.categoryId, name: categoryName },
     });
     this.blocks = [...this.blocks, created];

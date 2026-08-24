@@ -343,6 +343,12 @@
                 <span class="block-content">
                   <strong>{{ block.name }}</strong>
                   <small>Categoria: {{ block.category.name }}</small>
+                  @if (block.description) {
+                    <p class="block-description">{{ block.description }}</p>
+                  }
+                  @if (sequencePreview(block)) {
+                    <small class="sequence-preview">{{ sequencePreview(block) }}</small>
+                  }
                   @if (!block.active) {
                     <em>Bloco inativo</em>
                   }

@@ -28,6 +28,9 @@ interface WorkoutForm {
 interface BlockForm {
   name: string;
   categoryId: string;
+  description: string;
+  sequence: string[];
+  sequenceText: string;
 }
 
 @Component({
@@ -212,6 +215,46 @@ export class WorkoutsPage implements OnInit {
     return this.blockCreateForm.name.trim() !== '' && this.blockCreateForm.categoryId !== '';
   }
 
+  protected addBlockSequenceItem(input?: HTMLInputElement): void {
+    const text = this.blockCreateForm.sequenceText.trim();
+    if (text === '') {
+      return;
+    }
+
+    this.blockCreateForm.sequence = [...this.blockCreateForm.sequence, text];
+    this.blockCreateForm.sequenceText = '';
+    input?.focus();
+  }
+
+  protected addBlockSequenceItemFromKeyboard(event: KeyboardEvent, input: HTMLInputElement): void {
+    event.preventDefault();
+    this.addBlockSequenceItem(input);
+  }
+
+  protected removeBlockSequenceItem(index: number): void {
+    this.blockCreateForm.sequence = this.blockCreateForm.sequence.filter((_, itemIndex) => itemIndex !== index);
+  }
+
+  protected moveBlockSequenceItemUp(index: number): void {
+    if (index <= 0) {
+      return;
+    }
+
+    const sequence = this.blockCreateForm.sequence.slice();
+    [sequence[index - 1], sequence[index]] = [sequence[index], sequence[index - 1]];
+    this.blockCreateForm.sequence = sequence;
+  }
+
+  protected moveBlockSequenceItemDown(index: number): void {
+    if (index >= this.blockCreateForm.sequence.length - 1) {
+      return;
+    }
+
+    const sequence = this.blockCreateForm.sequence.slice();
+    [sequence[index], sequence[index + 1]] = [sequence[index + 1], sequence[index]];
+    this.blockCreateForm.sequence = sequence;
+  }
+
   protected categoryFormValid(): boolean {
     return this.categoryCreateForm.name.trim() !== '';
   }
@@ -263,6 +306,8 @@ export class WorkoutsPage implements OnInit {
       const block = await this.blockApi.create({
         name: this.blockCreateForm.name,
         categoryId: this.blockCreateForm.categoryId,
+        description: this.blockCreateForm.description,
+        sequence: this.blockCreateForm.sequence.map((text) => ({ text })),
       });
       this.blocks.update((items) => [...items, block].sort(compareBlocks));
       this.addExistingBlock(block);
@@ -394,6 +439,10 @@ export class WorkoutsPage implements OnInit {
     return block.active ? '' : 'Inativo';
   }
 
+  protected sequencePreview(block: { sequence?: Array<{ text: string }> }): string {
+    return block.sequence?.map((item) => item.text).join(' → ') ?? '';
+  }
+
   protected formatBlockCount(workout: WorkoutListItem): string {
     return workout.blockCount === 1 ? '1 bloco' : `${workout.blockCount} blocos`;
   }
@@ -511,6 +560,8 @@ export class WorkoutsPage implements OnInit {
     return {
       id: block.id,
       name: block.name,
+      description: block.description,
+      sequence: block.sequence,
       active: block.active,
       position,
       category: block.category,
@@ -601,7 +652,7 @@ export class WorkoutsPage implements OnInit {
   }
 
   private emptyBlockForm(): BlockForm {
-    return { name: '', categoryId: '' };
+    return { name: '', categoryId: '', description: '', sequence: [], sequenceText: '' };
   }
 }
 

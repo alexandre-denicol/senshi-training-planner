@@ -109,7 +109,7 @@ func TestBlockHTTPJSONValidation(t *testing.T) {
 		body string
 	}{
 		{name: "malformed", body: `{"name":`},
-		{name: "unknown field", body: `{"name":"Base","categoryId":"` + activeCategoryID + `","description":"x"}`},
+		{name: "unknown field", body: `{"name":"Base","categoryId":"` + activeCategoryID + `","unexpected":"x"}`},
 		{name: "trailing json", body: `{"name":"Base","categoryId":"` + activeCategoryID + `"} {"name":"Outra"}`},
 		{name: "oversized", body: `{"name":"` + strings.Repeat("a", httpapi.MaxJSONBodyBytes) + `","categoryId":"` + activeCategoryID + `"}`},
 	}

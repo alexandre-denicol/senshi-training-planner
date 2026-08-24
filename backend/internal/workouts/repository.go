@@ -6,6 +6,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -196,7 +197,7 @@ func (s *PostgresStore) getWorkout(ctx context.Context, db queryer, id string) (
 	}
 
 	const blocksQuery = `
-		SELECT b.id::text, b.name, b.active, wb.position, c.id::text, c.name
+		SELECT b.id::text, b.name, b.description, b.active, wb.position, c.id::text, c.name
 		FROM workout_blocks wb
 		JOIN blocks b ON b.id = wb.block_id
 		JOIN categories c ON c.id = b.category_id
@@ -212,9 +213,11 @@ func (s *PostgresStore) getWorkout(ctx context.Context, db queryer, id string) (
 	workout.Blocks = []WorkoutBlock{}
 	for rows.Next() {
 		var block WorkoutBlock
+		var description pgtype.Text
 		if err := rows.Scan(
 			&block.ID,
 			&block.Name,
+			&description,
 			&block.Active,
 			&block.Position,
 			&block.Category.ID,
@@ -222,13 +225,57 @@ func (s *PostgresStore) getWorkout(ctx context.Context, db queryer, id string) (
 		); err != nil {
 			return WorkoutDetail{}, err
 		}
+		if description.Valid {
+			block.Description = &description.String
+		}
+		block.Sequence = []BlockSequenceItem{}
 		workout.Blocks = append(workout.Blocks, block)
 	}
 	if err := rows.Err(); err != nil {
 		return WorkoutDetail{}, err
 	}
+	if err := loadWorkoutBlockSequences(ctx, db, workout.Blocks); err != nil {
+		return WorkoutDetail{}, err
+	}
 
 	return workout, nil
+}
+
+func loadWorkoutBlockSequences(ctx context.Context, db queryer, blocks []WorkoutBlock) error {
+	if len(blocks) == 0 {
+		return nil
+	}
+
+	byID := make(map[string]*WorkoutBlock, len(blocks))
+	ids := make([]string, 0, len(blocks))
+	for index := range blocks {
+		byID[blocks[index].ID] = &blocks[index]
+		ids = append(ids, blocks[index].ID)
+	}
+
+	const query = `
+		SELECT block_id::text, position, text
+		FROM block_sequence_items
+		WHERE block_id::text = ANY($1)
+		ORDER BY block_id, position ASC`
+	rows, err := db.Query(ctx, query, ids)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var blockID string
+		var item BlockSequenceItem
+		if err := rows.Scan(&blockID, &item.Position, &item.Text); err != nil {
+			return err
+		}
+		if block := byID[blockID]; block != nil {
+			block.Sequence = append(block.Sequence, item)
+		}
+	}
+
+	return rows.Err()
 }
 
 func validateActiveBlocks(ctx context.Context, tx pgx.Tx, blockIDs []string) error {

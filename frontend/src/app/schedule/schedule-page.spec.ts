@@ -75,7 +75,17 @@ describe('SchedulePage', () => {
       id: 'workout-1',
       name: 'Treino Técnico',
       blocks: [
-        workoutBlock({ id: 'block-1', name: 'Aquecimento', position: 1, category: { id: 'category-1', name: 'Preparação' } }),
+        workoutBlock({
+          id: 'block-1',
+          name: 'Aquecimento',
+          description: 'Preparar articulações e elevar frequência.',
+          sequence: [
+            { position: 1, text: 'Corrida leve' },
+            { position: 2, text: 'Mobilidade de quadril' },
+          ],
+          position: 1,
+          category: { id: 'category-1', name: 'Preparação' },
+        }),
         workoutBlock({ id: 'block-2', name: 'Combinações de jab e direto com nome bastante longo para validar quebra natural', position: 2, category: { id: 'category-2', name: 'Técnica' } }),
         workoutBlock({ id: 'block-3', name: 'Alongamento', active: false, position: 3, category: { id: 'category-3', name: 'Finalização' } }),
       ],
@@ -100,6 +110,8 @@ describe('SchedulePage', () => {
     expect(detailText).toContain('Blocos do treino');
     expect(detailText).toContain('Aquecimento');
     expect(detailText).toContain('Categoria: Preparação');
+    expect(detailText).toContain('Preparar articulações e elevar frequência.');
+    expect(detailText).toContain('Corrida leve → Mobilidade de quadril');
     expect(detailText).toContain('Combinações de jab e direto');
     expect(detailText).toContain('Categoria: Técnica');
     expect(detailText).toContain('Alongamento');
@@ -793,6 +805,8 @@ function workoutBlock(overrides: Partial<WorkoutDetail['blocks'][number]> = {}):
   return {
     id: 'block-id',
     name: 'Bloco Base',
+    description: null,
+    sequence: [],
     active: true,
     position: 1,
     category: { id: 'category-id', name: 'Categoria Base' },

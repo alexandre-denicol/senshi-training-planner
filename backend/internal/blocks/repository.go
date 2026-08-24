@@ -6,6 +6,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -21,7 +22,7 @@ func NewPostgresStore(pool *pgxpool.Pool) *PostgresStore {
 
 func (s *PostgresStore) ListBlocks(ctx context.Context) ([]Block, error) {
 	const query = `
-		SELECT b.id::text, b.name, b.active, c.id::text, c.name, b.created_at, b.updated_at
+		SELECT b.id::text, b.name, b.description, b.active, c.id::text, c.name, b.created_at, b.updated_at
 		FROM blocks b
 		JOIN categories c ON c.id = b.category_id
 		ORDER BY lower(c.name) ASC, c.name ASC, lower(b.name) ASC, b.name ASC`
@@ -43,24 +44,33 @@ func (s *PostgresStore) ListBlocks(ctx context.Context) ([]Block, error) {
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+	if err := loadBlockSequences(ctx, s.pool, blocks); err != nil {
+		return nil, err
+	}
 
 	return blocks, nil
 }
 
 func (s *PostgresStore) CreateBlock(ctx context.Context, block NewBlock) (Block, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return Block{}, err
+	}
+	defer tx.Rollback(ctx)
+
 	const query = `
 		WITH inserted AS (
-			INSERT INTO blocks (id, name, category_id)
-			SELECT $1, $2, id
+			INSERT INTO blocks (id, name, category_id, description)
+			SELECT $1, $2, id, $4
 			FROM categories
 			WHERE id = $3 AND active = true
-			RETURNING id, name, active, category_id, created_at, updated_at
+			RETURNING id, name, description, active, category_id, created_at, updated_at
 		)
-		SELECT i.id::text, i.name, i.active, c.id::text, c.name, i.created_at, i.updated_at
+		SELECT i.id::text, i.name, i.description, i.active, c.id::text, c.name, i.created_at, i.updated_at
 		FROM inserted i
 		JOIN categories c ON c.id = i.category_id`
 
-	created, err := scanBlock(s.pool.QueryRow(ctx, query, block.ID, block.Name, block.CategoryID))
+	created, err := scanBlock(tx.QueryRow(ctx, query, block.ID, block.Name, block.CategoryID, block.Description))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Block{}, ErrInvalidCategory
 	}
@@ -73,26 +83,39 @@ func (s *PostgresStore) CreateBlock(ctx context.Context, block NewBlock) (Block,
 	if err != nil {
 		return Block{}, err
 	}
+	if err := insertSequenceItems(ctx, tx, block.ID, block.Sequence); err != nil {
+		return Block{}, err
+	}
+	created.Sequence = sequenceItemsFromNew(block.Sequence)
+	if err := tx.Commit(ctx); err != nil {
+		return Block{}, err
+	}
 
 	return created, nil
 }
 
-func (s *PostgresStore) UpdateBlock(ctx context.Context, id string, name string, categoryID string) (Block, error) {
+func (s *PostgresStore) UpdateBlock(ctx context.Context, id string, name string, categoryID string, description *string, sequence []NewSequenceItem) (Block, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return Block{}, err
+	}
+	defer tx.Rollback(ctx)
+
 	const query = `
 		WITH active_category AS (
 			SELECT id FROM categories WHERE id = $3 AND active = true
 		),
 		updated AS (
 			UPDATE blocks
-			SET name = $2, category_id = (SELECT id FROM active_category)
+			SET name = $2, category_id = (SELECT id FROM active_category), description = $4
 			WHERE id = $1 AND EXISTS (SELECT 1 FROM active_category)
-			RETURNING id, name, active, category_id, created_at, updated_at
+			RETURNING id, name, description, active, category_id, created_at, updated_at
 		)
-		SELECT u.id::text, u.name, u.active, c.id::text, c.name, u.created_at, u.updated_at
+		SELECT u.id::text, u.name, u.description, u.active, c.id::text, c.name, u.created_at, u.updated_at
 		FROM updated u
 		JOIN categories c ON c.id = u.category_id`
 
-	updated, err := scanBlock(s.pool.QueryRow(ctx, query, id, name, categoryID))
+	updated, err := scanBlock(tx.QueryRow(ctx, query, id, name, categoryID, description))
 	if errors.Is(err, pgx.ErrNoRows) {
 		if exists, existsErr := s.blockExists(ctx, id); existsErr != nil {
 			return Block{}, existsErr
@@ -110,6 +133,16 @@ func (s *PostgresStore) UpdateBlock(ctx context.Context, id string, name string,
 	if err != nil {
 		return Block{}, err
 	}
+	if _, err := tx.Exec(ctx, `DELETE FROM block_sequence_items WHERE block_id = $1`, id); err != nil {
+		return Block{}, err
+	}
+	if err := insertSequenceItems(ctx, tx, id, sequence); err != nil {
+		return Block{}, err
+	}
+	updated.Sequence = sequenceItemsFromNew(sequence)
+	if err := tx.Commit(ctx); err != nil {
+		return Block{}, err
+	}
 
 	return updated, nil
 }
@@ -120,9 +153,9 @@ func (s *PostgresStore) SetBlockStatus(ctx context.Context, id string, active bo
 			UPDATE blocks
 			SET active = $2
 			WHERE id = $1
-			RETURNING id, name, active, category_id, created_at, updated_at
+			RETURNING id, name, description, active, category_id, created_at, updated_at
 		)
-		SELECT u.id::text, u.name, u.active, c.id::text, c.name, u.created_at, u.updated_at
+		SELECT u.id::text, u.name, u.description, u.active, c.id::text, c.name, u.created_at, u.updated_at
 		FROM updated u
 		JOIN categories c ON c.id = u.category_id`
 
@@ -133,6 +166,11 @@ func (s *PostgresStore) SetBlockStatus(ctx context.Context, id string, active bo
 	if err != nil {
 		return Block{}, err
 	}
+	blocks := []Block{updated}
+	if err := loadBlockSequences(ctx, s.pool, blocks); err != nil {
+		return Block{}, err
+	}
+	updated = blocks[0]
 
 	return updated, nil
 }
@@ -171,9 +209,11 @@ type blockScanner interface {
 
 func scanBlock(row blockScanner) (Block, error) {
 	var block Block
+	var description pgtype.Text
 	err := row.Scan(
 		&block.ID,
 		&block.Name,
+		&description,
 		&block.Active,
 		&block.Category.ID,
 		&block.Category.Name,
@@ -183,8 +223,74 @@ func scanBlock(row blockScanner) (Block, error) {
 	if err != nil {
 		return Block{}, err
 	}
+	if description.Valid {
+		block.Description = &description.String
+	}
+	block.Sequence = []SequenceItem{}
 
 	return block, nil
+}
+
+func loadBlockSequences(ctx context.Context, db queryer, blocks []Block) error {
+	if len(blocks) == 0 {
+		return nil
+	}
+
+	byID := make(map[string]*Block, len(blocks))
+	ids := make([]string, 0, len(blocks))
+	for index := range blocks {
+		byID[blocks[index].ID] = &blocks[index]
+		ids = append(ids, blocks[index].ID)
+	}
+
+	const query = `
+		SELECT block_id::text, position, text
+		FROM block_sequence_items
+		WHERE block_id::text = ANY($1)
+		ORDER BY block_id, position ASC`
+	rows, err := db.Query(ctx, query, ids)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var blockID string
+		var item SequenceItem
+		if err := rows.Scan(&blockID, &item.Position, &item.Text); err != nil {
+			return err
+		}
+		if block := byID[blockID]; block != nil {
+			block.Sequence = append(block.Sequence, item)
+		}
+	}
+
+	return rows.Err()
+}
+
+type queryer interface {
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+}
+
+func insertSequenceItems(ctx context.Context, tx pgx.Tx, blockID string, sequence []NewSequenceItem) error {
+	const query = `
+		INSERT INTO block_sequence_items (block_id, position, text)
+		VALUES ($1, $2, $3)`
+	for _, item := range sequence {
+		if _, err := tx.Exec(ctx, query, blockID, item.Position, item.Text); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func sequenceItemsFromNew(sequence []NewSequenceItem) []SequenceItem {
+	items := make([]SequenceItem, 0, len(sequence))
+	for _, item := range sequence {
+		items = append(items, SequenceItem{Position: item.Position, Text: item.Text})
+	}
+	return items
 }
 
 func blockNameUniqueViolation(err error) bool {

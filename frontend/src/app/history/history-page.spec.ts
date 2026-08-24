@@ -69,8 +69,17 @@ describe('HistoryPage', () => {
     api.details.set('history-1', historyDetail({
       id: 'history-1',
       blocks: [
-        { position: 1, blockName: 'Bloco Snapshot A', categoryName: 'Categoria Snapshot A' },
-        { position: 2, blockName: 'Bloco Snapshot B', categoryName: 'Categoria Snapshot B' },
+        {
+          position: 1,
+          blockName: 'Bloco Snapshot A',
+          categoryName: 'Categoria Snapshot A',
+          description: 'Descrição capturada do bloco.',
+          sequence: [
+            { position: 1, text: 'Primeiro item capturado' },
+            { position: 2, text: 'Segundo item capturado' },
+          ],
+        },
+        { position: 2, blockName: 'Bloco Snapshot B', categoryName: 'Categoria Snapshot B', description: null, sequence: [] },
       ],
       participantCount: 12,
       participantNames: ['João', 'Maria', 'Pedro'],
@@ -86,6 +95,9 @@ describe('HistoryPage', () => {
     expect(text).toContain('Detalhes do histórico');
     expect(text).toContain('Bloco Snapshot A');
     expect(text).toContain('Categoria Snapshot A');
+    expect(text).toContain('Descrição capturada do bloco.');
+    expect(text).toContain('Primeiro item capturado');
+    expect(text).toContain('Segundo item capturado');
     expect(text).toContain('Participação');
     expect(text).toContain('Quantidade: 12 alunos');
     expect(text).toContain('João');
@@ -197,7 +209,7 @@ function historyDetail(overrides: Partial<HistoryDetail> = {}): HistoryDetail {
     completedByName: 'Professor Snapshot',
     completedAt: '2026-08-24T15:32:00Z',
     blocks: [
-      { position: 1, blockName: 'Bloco Snapshot', categoryName: 'Categoria Snapshot' },
+      { position: 1, blockName: 'Bloco Snapshot', categoryName: 'Categoria Snapshot', description: null, sequence: [] },
     ],
     ...overrides,
   };
