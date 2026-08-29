@@ -41,13 +41,13 @@ test('richer Block editor supports free-text description and ordered sequence', 
   await expectTextInOrder(createDialog.locator('.sequence-list'), ['Jab', 'Direto', 'Direto', 'Mawashi geri trás']);
   await createDialog.getByRole('button', { name: 'Mover item para cima' }).nth(3).click();
   await createDialog.getByRole('button', { name: 'Mover item para baixo' }).first().click();
-  await createDialog.getByRole('button', { name: 'Remover item' }).nth(2).click();
-  await expectTextInOrder(createDialog.locator('.sequence-list'), ['Jab', 'Mawashi geri trás', 'Direto']);
+  await createDialog.getByRole('button', { name: 'Remover item' }).nth(3).click();
+  await expectTextInOrder(createDialog.locator('.sequence-list'), ['Direto', 'Jab', 'Mawashi geri trás']);
   await createDialog.getByRole('button', { name: 'Salvar' }).click();
 
   await expect(page.getByRole('status')).toContainText('Bloco cadastrado com sucesso.');
   await page.getByRole('row', { name: new RegExp(blockName) }).getByRole('button', { name: 'Editar bloco' }).click();
   const editDialog = dialog(page, 'Editar bloco');
   await expect(editDialog.getByLabel('Descrição / instruções (opcional)')).toHaveValue(description);
-  await expectTextInOrder(editDialog.locator('.sequence-list'), ['Jab', 'Mawashi geri trás', 'Direto']);
+  await expectTextInOrder(editDialog.locator('.sequence-list'), ['Direto', 'Jab', 'Mawashi geri trás']);
 });

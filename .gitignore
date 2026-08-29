@@ -7,8 +7,10 @@ Thumbs.db
 
 # Environment
 .env
+.env.e2e.local
 .env.*
 !.env.example
+!.env.e2e.example
 
 # Logs
 *.log

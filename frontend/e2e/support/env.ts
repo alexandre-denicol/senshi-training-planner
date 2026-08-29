@@ -33,6 +33,12 @@ export function requireMutationSafety(): void {
   if (!mutationAllowed()) {
     test.skip(true, 'Mutable E2E tests require E2E_ALLOW_MUTATION=true and an isolated test database.');
   }
+  if (!hasSafeE2EDatabaseMarker()) {
+    test.skip(true, 'Mutable E2E tests require E2E_DATABASE_URL pointing at the local senshi_e2e PostgreSQL database.');
+  }
+  if (!hasSafeE2EBackendTarget()) {
+    test.skip(true, 'Mutable E2E tests require E2E_API_PROXY_TARGET pointing at the isolated E2E backend.');
+  }
 }
 
 export function uniqueName(prefix: string): string {
@@ -72,4 +78,44 @@ function credentials(emailKey: string, passwordKey: string): E2ECredentials | nu
 
 function pad2(value: number): string {
   return value.toString().padStart(2, '0');
+}
+
+function hasSafeE2EDatabaseMarker(): boolean {
+  const databaseURL = process.env.E2E_DATABASE_URL;
+  if (!databaseURL) {
+    return false;
+  }
+
+  try {
+    const parsed = new URL(databaseURL);
+    const hostname = parsed.hostname.toLowerCase();
+    return (
+      (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]') &&
+      parsed.pathname === '/senshi_e2e' &&
+      parsed.searchParams.get('sslmode') === 'disable'
+    );
+  } catch {
+    return false;
+  }
+}
+
+function hasSafeE2EBackendTarget(): boolean {
+  const target = process.env.E2E_API_PROXY_TARGET || process.env.API_PROXY_TARGET;
+  if (!target) {
+    return false;
+  }
+
+  try {
+    const parsed = new URL(target);
+    const hostname = parsed.hostname.toLowerCase();
+    return (
+      (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]') &&
+      parsed.port !== '' &&
+      parsed.port !== '8080' &&
+      parsed.port !== '18080' &&
+      parsed.port !== '4200'
+    );
+  } catch {
+    return false;
+  }
 }

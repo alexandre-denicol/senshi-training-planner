@@ -16,11 +16,20 @@ export function dialog(page: Page, name: string): Locator {
 }
 
 export async function expectTextInOrder(container: Locator, values: string[]): Promise<void> {
+  const items = container.locator('li');
+  if ((await items.count()) > 0) {
+    await expect(items).toHaveCount(values.length);
+    for (const [index, value] of values.entries()) {
+      await expect(items.nth(index), `${value} should be visible at position ${index + 1}`).toContainText(value);
+    }
+    return;
+  }
+
   const text = await container.textContent();
   expect(text ?? '').toContain(values[0]);
   let previous = -1;
   for (const value of values) {
-    const index = (text ?? '').indexOf(value);
+    const index = (text ?? '').indexOf(value, previous + 1);
     expect(index, `${value} should be visible after the previous value`).toBeGreaterThan(previous);
     previous = index;
   }

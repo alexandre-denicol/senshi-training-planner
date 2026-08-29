@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/alexandre/senshi-training-planner/backend/internal/config"
 	"github.com/alexandre/senshi-training-planner/backend/internal/database"
@@ -35,13 +36,13 @@ func run(args []string) error {
 	if err != nil {
 		return err
 	}
-	if err := database.ValidateDatabaseURL(cfg.DatabaseURL); err != nil {
+	if err := database.ValidateDatabaseURL(cfg.DatabaseURL, string(cfg.AppEnv)); err != nil {
 		return err
 	}
 
 	m, err := migrate.New(migrationsSourceURL, cfg.DatabaseURL)
 	if err != nil {
-		return errors.New("could not initialize migrations")
+		return safeMigrationInitError(err, cfg.DatabaseURL)
 	}
 	defer m.Close()
 
@@ -55,6 +56,14 @@ func run(args []string) error {
 	}
 
 	return nil
+}
+
+func safeMigrationInitError(err error, databaseURL string) error {
+	if databaseURL != "" && strings.Contains(err.Error(), databaseURL) {
+		return errors.New("could not initialize migrations")
+	}
+
+	return fmt.Errorf("could not initialize migrations: %w", err)
 }
 
 func migrateUp(m *migrate.Migrate) error {
