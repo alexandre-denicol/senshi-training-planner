@@ -3,6 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 const port = Number(process.env.E2E_FRONTEND_PORT ?? 4200);
 const host = process.env.E2E_FRONTEND_HOST ?? '127.0.0.1';
 const baseURL = process.env.E2E_BASE_URL ?? `http://${host}:${port}`;
+const apiProxyTarget = process.env.E2E_API_PROXY_TARGET ?? process.env.API_PROXY_TARGET ?? 'http://localhost:18080';
 
 export default defineConfig({
   testDir: './e2e',
@@ -32,5 +33,10 @@ export default defineConfig({
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
+    env: {
+      ...process.env,
+      API_PROXY_TARGET: apiProxyTarget,
+      E2E_API_PROXY_TARGET: apiProxyTarget,
+    },
   },
 });

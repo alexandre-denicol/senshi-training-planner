@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"errors"
+	"net"
 	"net/url"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -14,8 +15,8 @@ var (
 	ErrTLSRequired        = errors.New("DATABASE_URL must require TLS with sslmode=require, verify-ca, or verify-full")
 )
 
-func NewPool(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
-	if err := ValidateDatabaseURL(databaseURL); err != nil {
+func NewPool(ctx context.Context, databaseURL string, appEnv string) (*pgxpool.Pool, error) {
+	if err := ValidateDatabaseURL(databaseURL, appEnv); err != nil {
 		return nil, err
 	}
 
@@ -27,7 +28,7 @@ func NewPool(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
 	return pgxpool.NewWithConfig(ctx, cfg)
 }
 
-func ValidateDatabaseURL(databaseURL string) error {
+func ValidateDatabaseURL(databaseURL string, appEnv string) error {
 	if databaseURL == "" {
 		return ErrMissingDatabaseURL
 	}
@@ -44,7 +45,21 @@ func ValidateDatabaseURL(databaseURL string) error {
 	switch parsed.Query().Get("sslmode") {
 	case "require", "verify-ca", "verify-full":
 		return nil
+	case "disable":
+		if appEnv == "development" && isLocalhost(parsed.Hostname()) {
+			return nil
+		}
+		return ErrTLSRequired
 	default:
 		return ErrTLSRequired
 	}
+}
+
+func isLocalhost(host string) bool {
+	if host == "localhost" {
+		return true
+	}
+
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }

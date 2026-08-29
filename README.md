@@ -181,6 +181,19 @@ Os testes E2E usam o aplicativo real no navegador e o backend via proxy `/api`.
 Testes autenticados exigem `E2E_ADMIN_EMAIL`, `E2E_ADMIN_PASSWORD`,
 `E2E_PROFESSOR_EMAIL` e `E2E_PROFESSOR_PASSWORD`. Testes que criam ou alteram
 dados exigem tambem `E2E_ALLOW_MUTATION=true` e devem rodar somente contra um
-banco isolado de E2E/testes. Mais detalhes em `frontend/e2e/README.md`.
+banco isolado de E2E/testes.
+
+Para testes mutaveis locais, use um PostgreSQL isolado e um backend separado,
+por exemplo:
+
+```bash
+cp .env.e2e.example .env.e2e.local
+# edite .env.e2e.local com senhas locais
+```
+
+O proxy Angular usa `frontend/proxy.conf.cjs`. Por padrao ele aponta `/api` para
+`http://localhost:18080`; para E2E mutavel, defina `E2E_API_PROXY_TARGET` em
+`.env.e2e.local`, normalmente `http://localhost:18081`. Mais detalhes em
+`frontend/e2e/README.md`.
 
 A interface deve ser desenvolvida em pt-BR, com dark mode como estilo visual padrao e layout responsivo para desktop e mobile.

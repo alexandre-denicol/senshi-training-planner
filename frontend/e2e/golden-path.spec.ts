@@ -142,8 +142,11 @@ async function editBlock(page: Page, oldName: string, newName: string, descripti
   const modal = dialog(page, 'Editar bloco');
   await modal.getByLabel('Nome').fill(newName);
   await modal.getByLabel('Descrição / instruções (opcional)').fill(description);
-  while (await modal.getByRole('button', { name: 'Remover item' }).count() > 0) {
-    await modal.getByRole('button', { name: 'Remover item' }).first().click();
+  const removeButtons = modal.getByRole('button', { name: 'Remover item' });
+  while ((await removeButtons.count()) > 0) {
+    const count = await removeButtons.count();
+    await removeButtons.nth(count - 1).click();
+    await expect(removeButtons).toHaveCount(count - 1);
   }
   for (const item of sequence) {
     await modal.getByLabel('Item da sequência').fill(item);

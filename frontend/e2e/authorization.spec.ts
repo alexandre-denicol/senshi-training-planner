@@ -3,6 +3,15 @@ import { login } from './support/auth';
 import { adminCredentials, professorCredentials, requireBackend, requireCredentials } from './support/env';
 import { openNav } from './support/ui';
 
+const expectedHeadings: Record<string, string | RegExp> = {
+  Dashboard: /Olá,/,
+  Agenda: 'Agenda',
+  Treinos: 'Treinos',
+  Blocos: 'Blocos',
+  Categorias: 'Categorias',
+  Histórico: 'Histórico',
+};
+
 test('ADMIN can access Professores and operational areas', async ({ page }) => {
   await requireBackend(page);
   const credentials = adminCredentials();
@@ -15,7 +24,7 @@ test('ADMIN can access Professores and operational areas', async ({ page }) => {
 
   for (const item of ['Dashboard', 'Agenda', 'Treinos', 'Blocos', 'Categorias', 'Histórico']) {
     await openNav(page, item);
-    await expect(page.getByRole('heading')).toBeVisible();
+    await expect(page.getByRole('heading', { name: expectedHeadings[item] })).toBeVisible();
   }
 });
 
@@ -32,6 +41,6 @@ test('PROFESSOR cannot access Professores but can access operational areas', asy
 
   for (const item of ['Dashboard', 'Agenda', 'Treinos', 'Blocos', 'Categorias', 'Histórico']) {
     await openNav(page, item);
-    await expect(page.getByRole('heading')).toBeVisible();
+    await expect(page.getByRole('heading', { name: expectedHeadings[item] })).toBeVisible();
   }
 });
