@@ -7,6 +7,7 @@ import { ButtonModule } from 'primeng/button';
 import { DialogModule } from 'primeng/dialog';
 import { InputTextModule } from 'primeng/inputtext';
 import { AuthService } from '../auth/auth.service';
+import { Student, StudentApiService } from '../students/student-api.service';
 import { WorkoutApiService, WorkoutDetail, WorkoutListItem } from '../workouts/workout-api.service';
 import { CompletionDetails, ScheduleApiService, ScheduleEntry, ScheduleWorkout } from './schedule-api.service';
 
@@ -26,9 +27,8 @@ interface ConfirmationState {
 }
 
 interface CompletionForm {
-  participantCount: string | number | null;
-  participantName: string;
-  participantNames: string[];
+  studentSearch: string;
+  selectedStudents: Student[];
   notes: string;
 }
 
@@ -41,6 +41,7 @@ interface CompletionForm {
 export class SchedulePage implements OnInit {
   private readonly api = inject(ScheduleApiService);
   private readonly workoutApi = inject(WorkoutApiService);
+  private readonly studentApi = inject(StudentApiService);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly monthFormatter = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' });
@@ -55,7 +56,13 @@ export class SchedulePage implements OnInit {
   protected readonly errorMessage = signal('');
   protected readonly successMessage = signal('');
   protected readonly confirmation = signal<ConfirmationState | null>(null);
-  protected readonly completionFormError = signal('');
+  protected readonly completionStudents = signal<Student[]>([]);
+  protected readonly completionStudentsLoading = signal(false);
+  protected readonly completionStudentsError = signal('');
+  protected readonly activeCompletionStudents = computed(() =>
+    this.completionStudents().filter((student) => student.active),
+  );
+  protected readonly hasActiveCompletionStudents = computed(() => this.activeCompletionStudents().length > 0);
   protected readonly workoutDetail = signal<WorkoutDetail | null>(null);
   protected readonly workoutDetailLoading = signal(false);
   protected readonly workoutDetailError = signal('');
@@ -210,13 +217,38 @@ export class SchedulePage implements OnInit {
     this.completionEntry = entry;
     this.completionForm = this.emptyCompletionForm();
     this.completeDialogOpen.set(true);
+    void this.loadCompletionStudents();
   }
 
   protected closeCompleteDialog(): void {
     this.completeDialogOpen.set(false);
     this.completionEntry = null;
     this.completionForm = this.emptyCompletionForm();
-    this.completionFormError.set('');
+    this.completionStudents.set([]);
+    this.completionStudentsError.set('');
+  }
+
+  protected async loadCompletionStudents(): Promise<void> {
+    this.completionStudentsLoading.set(true);
+    this.completionStudentsError.set('');
+
+    try {
+      this.completionStudents.set(await this.studentApi.list());
+    } catch (error) {
+      if (error instanceof HttpErrorResponse) {
+        if (error.status === 401) {
+          await this.router.navigateByUrl('/login');
+          return;
+        }
+        if (error.status === 403) {
+          await this.router.navigateByUrl('/app');
+          return;
+        }
+      }
+      this.completionStudentsError.set('Não foi possível carregar os alunos. Tente novamente.');
+    } finally {
+      this.completionStudentsLoading.set(false);
+    }
   }
 
   protected async openWorkoutDetail(entry: ScheduleEntry): Promise<void> {
@@ -251,53 +283,37 @@ export class SchedulePage implements OnInit {
     this.workoutDetailLoadingEntryId.set(null);
   }
 
-  protected addParticipantName(input?: HTMLInputElement): void {
-    const name = (input?.value ?? this.completionForm.participantName).trim();
-    this.completionFormError.set('');
+  protected filteredCompletionStudents(): Student[] {
+    const query = this.completionForm.studentSearch.trim().toLocaleLowerCase('pt-BR');
+    const selectedIds = new Set(this.completionForm.selectedStudents.map((student) => student.id));
 
-    if (name === '') {
-      this.completionFormError.set('Informe o nome antes de adicionar.');
-      return;
-    }
-    if (Array.from(name).length > 120) {
-      this.completionFormError.set('Use no máximo 120 caracteres por nome.');
-      return;
-    }
-    if (this.completionForm.participantNames.length >= 100) {
-      this.completionFormError.set('Use no máximo 100 participantes registrados.');
+    return this.activeCompletionStudents()
+      .filter((student) => !selectedIds.has(student.id))
+      .filter((student) => query === '' || student.name.toLocaleLowerCase('pt-BR').includes(query))
+      .slice(0, 20);
+  }
+
+  protected selectStudent(student: Student): void {
+    if (this.completionForm.selectedStudents.some((selected) => selected.id === student.id)) {
       return;
     }
 
     this.completionForm = {
       ...this.completionForm,
-      participantName: '',
-      participantNames: [...this.completionForm.participantNames, name],
+      studentSearch: '',
+      selectedStudents: [...this.completionForm.selectedStudents, student],
     };
-    if (input) {
-      input.value = '';
-    }
   }
 
-  protected addParticipantNameFromKeyboard(event: Event, input: HTMLInputElement): void {
-    event.preventDefault();
-    this.addParticipantName(input);
-  }
-
-  protected removeParticipantName(index: number): void {
+  protected removeSelectedStudent(index: number): void {
     this.completionForm = {
       ...this.completionForm,
-      participantNames: this.completionForm.participantNames.filter((_, currentIndex) => currentIndex !== index),
+      selectedStudents: this.completionForm.selectedStudents.filter((_, currentIndex) => currentIndex !== index),
     };
   }
 
   protected completionFormValid(): boolean {
-    const count = this.completionCountText();
-    if (count === '') {
-      return this.completionNotesValid();
-    }
-
-    const value = Number(count);
-    return Number.isInteger(value) && value >= 0 && value <= 500 && this.completionNotesValid();
+    return this.completionNotesValid();
   }
 
   protected completionNotesCounter(): string {
@@ -312,7 +328,6 @@ export class SchedulePage implements OnInit {
     this.submitting.set(true);
     this.rowActionId.set(this.completionEntry.id);
     this.clearMessages();
-    this.completionFormError.set('');
 
     try {
       await this.api.complete(this.completionEntry.id, this.completionPayload());
@@ -470,17 +485,13 @@ export class SchedulePage implements OnInit {
   }
 
   private emptyCompletionForm(): CompletionForm {
-    return { participantCount: '', participantName: '', participantNames: [], notes: '' };
+    return { studentSearch: '', selectedStudents: [], notes: '' };
   }
 
   private completionPayload(): CompletionDetails {
     const payload: CompletionDetails = {};
-    const count = this.completionCountText();
-    if (count !== '') {
-      payload.participantCount = Number(count);
-    }
-    if (this.completionForm.participantNames.length > 0) {
-      payload.participantNames = this.completionForm.participantNames;
+    if (this.completionForm.selectedStudents.length > 0) {
+      payload.participantStudentIds = this.completionForm.selectedStudents.map((student) => student.id);
     }
     const notes = this.completionForm.notes.trim();
     if (notes !== '') {
@@ -488,15 +499,6 @@ export class SchedulePage implements OnInit {
     }
 
     return payload;
-  }
-
-  private completionCountText(): string {
-    const count = this.completionForm.participantCount;
-    if (count === null || count === undefined) {
-      return '';
-    }
-
-    return String(count).trim();
   }
 
   private completionNotesValid(): boolean {

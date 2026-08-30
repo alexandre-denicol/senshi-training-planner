@@ -9,13 +9,12 @@ import (
 )
 
 const MaxRangeDays = 93
-const MaxParticipantCount = 500
-const MaxParticipantNames = 100
-const MaxParticipantNameChars = 120
+const MaxParticipantStudentIDs = 100
 const MaxNotesChars = 2000
 
 var (
 	ErrInvalidRequest      = errors.New("invalid request")
+	ErrInvalidParticipants = errors.New("invalid participants")
 	ErrNotFound            = errors.New("history record not found")
 	ErrScheduleNotFound    = errors.New("schedule entry not found")
 	ErrAlreadyCompleted    = errors.New("training already completed")
@@ -71,7 +70,6 @@ type ServiceAPI interface {
 }
 
 type CompletionDetails struct {
-	ParticipantCount *int
-	ParticipantNames []string
-	Notes            *string
+	ParticipantStudentIDs []string
+	Notes                 *string
 }

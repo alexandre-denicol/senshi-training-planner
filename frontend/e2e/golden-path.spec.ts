@@ -1,4 +1,4 @@
-import { expect, Page, test } from '@playwright/test';
+import { expect, Locator, Page, test } from '@playwright/test';
 import { login } from './support/auth';
 import {
   adminCredentials,
@@ -11,7 +11,7 @@ import {
 } from './support/env';
 import { dialog, expectTextInOrder, openNav } from './support/ui';
 
-test('creates catalog data, schedules, completes training and verifies immutable History snapshot', async ({ page }) => {
+test('creates catalog data, schedules, completes training with registered Student participants and verifies immutable History snapshot', async ({ page }) => {
   await requireBackend(page);
   requireMutationSafety();
   const credentials = adminCredentials();
@@ -27,9 +27,14 @@ test('creates catalog data, schedules, completes training and verifies immutable
   const editedDescription = 'Descrição editada depois da conclusão.';
   const originalSequence = ['Jab', 'Direto', 'Hook frente', 'Mawashi geri trás'];
   const editedSequence = ['Sprawl', 'Trocar base'];
+  const studentOriginalName = uniqueName('Aluno Golden');
+  const studentRenamedName = `${studentOriginalName} Renomeado`;
+  const studentControlName = uniqueName('Aluno Golden Controle');
 
   await login(page, credentials);
 
+  await createStudent(page, studentOriginalName);
+  await createStudent(page, studentControlName);
   await createCategory(page, categoryName);
   await createBlock(page, originalBlockName, categoryName, originalDescription, originalSequence);
   await createWorkout(page, workoutName, originalBlockName);
@@ -49,42 +54,69 @@ test('creates catalog data, schedules, completes training and verifies immutable
 
   await agendaEntry.getByRole('button', { name: 'Realizar treino' }).click();
   const completion = dialog(page, 'Registrar treino realizado');
-  await completion.locator('input[name="participant-count"]').fill('3');
-  for (const participant of ['Aluno E2E 1', 'Aluno E2E 2', 'Aluno E2E 3']) {
-    await completion.getByLabel('Nome do participante').fill(participant);
-    await completion.getByRole('button', { name: 'Adicionar' }).click();
-  }
+  await selectParticipants(completion, [studentOriginalName, studentControlName]);
+  await expect(completion).toContainText('Participantes selecionados (2)');
   await completion.locator('textarea[name="completion-notes"]').fill('Treino realizado pelo teste E2E.');
   await completion.getByRole('button', { name: 'Registrar como realizado' }).click();
   await expect(agendaEntry).toContainText('Realizado');
 
-  await verifyHistorySnapshot(page, {
+  const expectedSnapshot = {
     workoutName,
     blockName: originalBlockName,
     categoryName,
     description: originalDescription,
     sequence: originalSequence,
-    participantCount: 'Quantidade: 3 alunos',
-    participants: ['Aluno E2E 1', 'Aluno E2E 2', 'Aluno E2E 3'],
+    participantCount: 'Quantidade: 2 alunos',
+    participants: [studentOriginalName, studentControlName],
     notes: 'Treino realizado pelo teste E2E.',
     displayDate,
-  });
+  };
+
+  await verifyHistorySnapshot(page, expectedSnapshot);
 
   await editBlock(page, originalBlockName, editedBlockName, editedDescription, editedSequence);
 
+  await verifyHistorySnapshot(page, { ...expectedSnapshot, absentText: editedBlockName });
+
+  // Rename the participant Student after the training is already completed. The
+  // History record must keep showing the original name forever - it is an
+  // immutable snapshot, not a live lookup into the Students table.
+  await renameStudent(page, studentOriginalName, studentRenamedName);
+
+  await page.reload();
+
   await verifyHistorySnapshot(page, {
-    workoutName,
-    blockName: originalBlockName,
-    categoryName,
-    description: originalDescription,
-    sequence: originalSequence,
-    participantCount: 'Quantidade: 3 alunos',
-    participants: ['Aluno E2E 1', 'Aluno E2E 2', 'Aluno E2E 3'],
-    notes: 'Treino realizado pelo teste E2E.',
-    displayDate,
-    absentText: editedBlockName,
+    ...expectedSnapshot,
+    absentText: studentRenamedName,
   });
 });
+
+async function createStudent(page: Page, name: string): Promise<void> {
+  await openNav(page, 'Alunos');
+  await page.getByRole('button', { name: 'Novo aluno' }).first().click();
+  const modal = dialog(page, 'Novo aluno');
+  await modal.getByLabel('Nome').fill(name);
+  await modal.getByRole('button', { name: 'Salvar' }).click();
+  await expect(page.getByRole('status')).toContainText('Aluno cadastrado com sucesso.');
+  await expect(page.getByRole('row', { name: new RegExp(name) })).toBeVisible();
+}
+
+async function renameStudent(page: Page, currentName: string, newName: string): Promise<void> {
+  await openNav(page, 'Alunos');
+  await page.getByRole('row', { name: new RegExp(currentName) }).getByRole('button', { name: 'Editar aluno' }).click();
+  const modal = dialog(page, 'Editar aluno');
+  await modal.getByLabel('Nome').fill(newName);
+  await modal.getByRole('button', { name: 'Salvar' }).click();
+  await expect(page.getByRole('status')).toContainText('Aluno atualizado com sucesso.');
+  await expect(page.getByRole('row', { name: new RegExp(newName) })).toBeVisible();
+}
+
+async function selectParticipants(completion: Locator, names: string[]): Promise<void> {
+  for (const name of names) {
+    await completion.getByLabel('Buscar aluno pelo nome').fill(name);
+    await completion.getByRole('button', { name, exact: true }).click();
+  }
+}
 
 async function createCategory(page: Page, categoryName: string): Promise<void> {
   await openNav(page, 'Categorias');

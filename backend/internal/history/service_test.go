@@ -14,6 +14,8 @@ const (
 	historyID       = "11111111-1111-1111-1111-111111111111"
 	scheduleEntryID = "22222222-2222-2222-2222-222222222222"
 	userID          = "33333333-3333-3333-3333-333333333333"
+	studentIDOne    = "44444444-4444-4444-4444-444444444444"
+	studentIDTwo    = "55555555-5555-5555-5555-555555555555"
 )
 
 func TestServiceCompleteSnapshotsScheduleAndUserData(t *testing.T) {
@@ -25,9 +27,8 @@ func TestServiceCompleteSnapshotsScheduleAndUserData(t *testing.T) {
 	user := auth.PublicUser{ID: userID, Name: "Professor X", Email: "professor@example.com", Role: auth.RoleProfessor}
 
 	detail, err := service.Complete(context.Background(), scheduleEntryID, user, CompletionDetails{
-		ParticipantCount: intPtr(12),
-		ParticipantNames: []string{" João ", "Maria"},
-		Notes:            stringPtr("  Turma respondeu bem.\nReduzimos a intensidade.  "),
+		ParticipantStudentIDs: []string{studentIDOne, studentIDTwo},
+		Notes:                 stringPtr("  Turma respondeu bem.\nReduzimos a intensidade.  "),
 	})
 	if err != nil {
 		t.Fatalf("expected completion success, got %v", err)
@@ -45,11 +46,8 @@ func TestServiceCompleteSnapshotsScheduleAndUserData(t *testing.T) {
 	if !store.completedAt.Equal(completedAt) {
 		t.Fatalf("expected server completion timestamp, got %s", store.completedAt)
 	}
-	if store.details.ParticipantCount == nil || *store.details.ParticipantCount != 12 {
-		t.Fatalf("expected participant count to reach store, got %#v", store.details.ParticipantCount)
-	}
-	if len(store.details.ParticipantNames) != 2 || store.details.ParticipantNames[0] != "João" || store.details.ParticipantNames[1] != "Maria" {
-		t.Fatalf("expected trimmed participant names to reach store, got %#v", store.details.ParticipantNames)
+	if len(store.details.ParticipantStudentIDs) != 2 || store.details.ParticipantStudentIDs[0] != studentIDOne || store.details.ParticipantStudentIDs[1] != studentIDTwo {
+		t.Fatalf("expected participant student ids to reach store, got %#v", store.details.ParticipantStudentIDs)
 	}
 	if store.details.Notes == nil || *store.details.Notes != "Turma respondeu bem.\nReduzimos a intensidade." {
 		t.Fatalf("expected trimmed notes with line breaks to reach store, got %#v", store.details.Notes)
@@ -69,30 +67,23 @@ func TestServiceCompleteParticipantDetailsValidation(t *testing.T) {
 	tests := []struct {
 		name      string
 		details   CompletionDetails
-		wantErr   bool
-		wantCount *int
-		wantNames []string
+		wantErr   error
+		wantIDs   []string
 		wantNotes *string
 	}{
-		{name: "no details", details: CompletionDetails{}, wantNames: []string{}},
-		{name: "empty object equivalent", details: CompletionDetails{ParticipantNames: nil}, wantNames: []string{}},
-		{name: "count only", details: CompletionDetails{ParticipantCount: intPtr(12)}, wantCount: intPtr(12), wantNames: []string{}},
-		{name: "names only", details: CompletionDetails{ParticipantNames: []string{" João ", "Maria"}}, wantNames: []string{"João", "Maria"}},
-		{name: "count and names", details: CompletionDetails{ParticipantCount: intPtr(2), ParticipantNames: []string{"João", "Maria"}}, wantCount: intPtr(2), wantNames: []string{"João", "Maria"}},
-		{name: "zero preserved", details: CompletionDetails{ParticipantCount: intPtr(0)}, wantCount: intPtr(0), wantNames: []string{}},
-		{name: "count can be smaller than names", details: CompletionDetails{ParticipantCount: intPtr(1), ParticipantNames: []string{"João", "Maria"}}, wantCount: intPtr(1), wantNames: []string{"João", "Maria"}},
-		{name: "duplicate names accepted", details: CompletionDetails{ParticipantNames: []string{"João", "João"}}, wantNames: []string{"João", "João"}},
-		{name: "notes trimmed", details: CompletionDetails{Notes: stringPtr("  Boa resposta da turma.  ")}, wantNames: []string{}, wantNotes: stringPtr("Boa resposta da turma.")},
-		{name: "notes line breaks preserved", details: CompletionDetails{Notes: stringPtr("Linha 1\nLinha 2")}, wantNames: []string{}, wantNotes: stringPtr("Linha 1\nLinha 2")},
-		{name: "whitespace notes become null", details: CompletionDetails{Notes: stringPtr("   \n\t  ")}, wantNames: []string{}},
-		{name: "exactly max notes accepted", details: CompletionDetails{Notes: stringPtr(strings.Repeat("ã", MaxNotesChars))}, wantNames: []string{}, wantNotes: stringPtr(strings.Repeat("ã", MaxNotesChars))},
-		{name: "negative count", details: CompletionDetails{ParticipantCount: intPtr(-1)}, wantErr: true},
-		{name: "too large count", details: CompletionDetails{ParticipantCount: intPtr(501)}, wantErr: true},
-		{name: "blank name", details: CompletionDetails{ParticipantNames: []string{""}}, wantErr: true},
-		{name: "whitespace name", details: CompletionDetails{ParticipantNames: []string{"   "}}, wantErr: true},
-		{name: "oversized name", details: CompletionDetails{ParticipantNames: []string{strings.Repeat("ã", MaxParticipantNameChars+1)}}, wantErr: true},
-		{name: "too many names", details: CompletionDetails{ParticipantNames: repeatNames(MaxParticipantNames + 1)}, wantErr: true},
-		{name: "oversized notes", details: CompletionDetails{Notes: stringPtr(strings.Repeat("ã", MaxNotesChars+1))}, wantErr: true},
+		{name: "no details", details: CompletionDetails{}, wantIDs: []string{}},
+		{name: "empty ids equivalent", details: CompletionDetails{ParticipantStudentIDs: nil}, wantIDs: []string{}},
+		{name: "single student", details: CompletionDetails{ParticipantStudentIDs: []string{studentIDOne}}, wantIDs: []string{studentIDOne}},
+		{name: "multiple students preserve order", details: CompletionDetails{ParticipantStudentIDs: []string{studentIDTwo, studentIDOne}}, wantIDs: []string{studentIDTwo, studentIDOne}},
+		{name: "ids are trimmed", details: CompletionDetails{ParticipantStudentIDs: []string{" " + studentIDOne + " "}}, wantIDs: []string{studentIDOne}},
+		{name: "notes trimmed", details: CompletionDetails{Notes: stringPtr("  Boa resposta da turma.  ")}, wantIDs: []string{}, wantNotes: stringPtr("Boa resposta da turma.")},
+		{name: "notes line breaks preserved", details: CompletionDetails{Notes: stringPtr("Linha 1\nLinha 2")}, wantIDs: []string{}, wantNotes: stringPtr("Linha 1\nLinha 2")},
+		{name: "whitespace notes become null", details: CompletionDetails{Notes: stringPtr("   \n\t  ")}, wantIDs: []string{}},
+		{name: "exactly max notes accepted", details: CompletionDetails{Notes: stringPtr(strings.Repeat("ã", MaxNotesChars))}, wantIDs: []string{}, wantNotes: stringPtr(strings.Repeat("ã", MaxNotesChars))},
+		{name: "malformed student id", details: CompletionDetails{ParticipantStudentIDs: []string{"not-a-uuid"}}, wantErr: ErrInvalidParticipants},
+		{name: "duplicate student id rejected", details: CompletionDetails{ParticipantStudentIDs: []string{studentIDOne, studentIDOne}}, wantErr: ErrInvalidParticipants},
+		{name: "too many student ids", details: CompletionDetails{ParticipantStudentIDs: repeatNames(MaxParticipantStudentIDs + 1)}, wantErr: ErrInvalidParticipants},
+		{name: "oversized notes", details: CompletionDetails{Notes: stringPtr(strings.Repeat("ã", MaxNotesChars+1))}, wantErr: ErrInvalidRequest},
 	}
 
 	for _, tt := range tests {
@@ -101,27 +92,21 @@ func TestServiceCompleteParticipantDetailsValidation(t *testing.T) {
 			service := NewService(store)
 			service.newUUID = func() (string, error) { return historyID, nil }
 			_, err := service.Complete(context.Background(), scheduleEntryID, auth.PublicUser{ID: userID, Name: "User", Role: auth.RoleAdmin}, tt.details)
-			if tt.wantErr {
-				if !errors.Is(err, ErrInvalidRequest) {
-					t.Fatalf("expected invalid request, got %v", err)
+			if tt.wantErr != nil {
+				if !errors.Is(err, tt.wantErr) {
+					t.Fatalf("expected %v, got %v", tt.wantErr, err)
 				}
 				return
 			}
 			if err != nil {
 				t.Fatalf("expected success, got %v", err)
 			}
-			if (tt.wantCount == nil) != (store.details.ParticipantCount == nil) {
-				t.Fatalf("expected count %#v, got %#v", tt.wantCount, store.details.ParticipantCount)
+			if len(store.details.ParticipantStudentIDs) != len(tt.wantIDs) {
+				t.Fatalf("expected ids %#v, got %#v", tt.wantIDs, store.details.ParticipantStudentIDs)
 			}
-			if tt.wantCount != nil && *tt.wantCount != *store.details.ParticipantCount {
-				t.Fatalf("expected count %d, got %d", *tt.wantCount, *store.details.ParticipantCount)
-			}
-			if len(store.details.ParticipantNames) != len(tt.wantNames) {
-				t.Fatalf("expected names %#v, got %#v", tt.wantNames, store.details.ParticipantNames)
-			}
-			for index, want := range tt.wantNames {
-				if store.details.ParticipantNames[index] != want {
-					t.Fatalf("expected names %#v, got %#v", tt.wantNames, store.details.ParticipantNames)
+			for index, want := range tt.wantIDs {
+				if store.details.ParticipantStudentIDs[index] != want {
+					t.Fatalf("expected ids %#v, got %#v", tt.wantIDs, store.details.ParticipantStudentIDs)
 				}
 			}
 			if (tt.wantNotes == nil) != (store.details.Notes == nil) {
@@ -143,6 +128,7 @@ func TestServiceCompleteMapsErrors(t *testing.T) {
 		{name: "missing schedule", err: ErrScheduleNotFound, want: ErrScheduleNotFound},
 		{name: "already completed", err: ErrAlreadyCompleted, want: ErrAlreadyCompleted},
 		{name: "empty composition", err: ErrSnapshotUnavailable, want: ErrSnapshotUnavailable},
+		{name: "nonexistent or inactive student", err: ErrInvalidParticipants, want: ErrInvalidParticipants},
 	}
 
 	for _, tt := range tests {

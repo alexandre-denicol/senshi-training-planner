@@ -10,9 +10,10 @@ const expectedHeadings: Record<string, string | RegExp> = {
   Blocos: 'Blocos',
   Categorias: 'Categorias',
   Histórico: 'Histórico',
+  Alunos: 'Alunos',
 };
 
-test('ADMIN can access Professores and operational areas', async ({ page }) => {
+test('ADMIN can access Professores, Alunos and operational areas', async ({ page }) => {
   await requireBackend(page);
   const credentials = adminCredentials();
   requireCredentials(credentials, 'ADMIN');
@@ -22,13 +23,13 @@ test('ADMIN can access Professores and operational areas', async ({ page }) => {
   await expect(page).toHaveURL(/\/app\/professores$/);
   await expect(page.getByRole('heading', { name: 'Professores' })).toBeVisible();
 
-  for (const item of ['Dashboard', 'Agenda', 'Treinos', 'Blocos', 'Categorias', 'Histórico']) {
+  for (const item of ['Dashboard', 'Agenda', 'Treinos', 'Blocos', 'Categorias', 'Histórico', 'Alunos']) {
     await openNav(page, item);
     await expect(page.getByRole('heading', { name: expectedHeadings[item] })).toBeVisible();
   }
 });
 
-test('PROFESSOR cannot access Professores but can access operational areas', async ({ page }) => {
+test('PROFESSOR cannot access Professores but can access Alunos and operational areas', async ({ page }) => {
   await requireBackend(page);
   const credentials = professorCredentials();
   requireCredentials(credentials, 'PROFESSOR');
@@ -39,7 +40,7 @@ test('PROFESSOR cannot access Professores but can access operational areas', asy
   await page.goto('/app/professores');
   await expect(page).not.toHaveURL(/\/app\/professores$/);
 
-  for (const item of ['Dashboard', 'Agenda', 'Treinos', 'Blocos', 'Categorias', 'Histórico']) {
+  for (const item of ['Dashboard', 'Agenda', 'Treinos', 'Blocos', 'Categorias', 'Histórico', 'Alunos']) {
     await openNav(page, item);
     await expect(page.getByRole('heading', { name: expectedHeadings[item] })).toBeVisible();
   }

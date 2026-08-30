@@ -4,6 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { AuthUser } from '../auth/auth.models';
 import { AuthService } from '../auth/auth.service';
+import { Student, StudentApiService } from '../students/student-api.service';
 import { WorkoutApiService, WorkoutDetail, WorkoutListItem } from '../workouts/workout-api.service';
 import { ScheduleApiService, ScheduleEntry } from './schedule-api.service';
 import { SchedulePage } from './schedule-page';
@@ -283,142 +284,175 @@ describe('SchedulePage', () => {
     expect(professorApi.completed).toEqual([{ id: 'entry-1', details: {} }]);
   });
 
-  it('submits optional participant details while preserving count/name independence', async () => {
+  it('submits selected students as participant ids', async () => {
     const original = entry({ id: 'entry-1' });
     const api = new FakeScheduleApi([original]);
-    const { component } = await renderPage(adminUser, [original], [workout()], api);
+    const joao = student({ id: 'student-1', name: 'João' });
+    const maria = student({ id: 'student-2', name: 'Maria' });
+    const studentApi = new FakeStudentApi([joao, maria]);
+    const { component } = await renderPage(adminUser, [original], [workout()], api, undefined, studentApi);
 
     component.confirmComplete(original);
-    component.completionForm.participantCount = '0';
+    await component.loadCompletionStudents();
     await component.completeEntry();
-    expect(api.completed.at(-1)).toEqual({ id: 'entry-1', details: { participantCount: 0 } });
+    expect(api.completed.at(-1)).toEqual({ id: 'entry-1', details: {} });
 
     component.confirmComplete(original);
-    component.completionForm.participantName = ' João ';
-    component.addParticipantName();
-    component.completionForm.participantName = 'Maria';
-    component.addParticipantName();
+    await component.loadCompletionStudents();
+    component.selectStudent(joao);
+    component.selectStudent(maria);
     await component.completeEntry();
-    expect(api.completed.at(-1)).toEqual({ id: 'entry-1', details: { participantNames: ['João', 'Maria'] } });
-
-    component.confirmComplete(original);
-    component.completionForm.participantCount = '1';
-    component.completionForm.participantNames = ['João', 'Maria'];
-    await component.completeEntry();
-    expect(api.completed.at(-1)).toEqual({ id: 'entry-1', details: { participantCount: 1, participantNames: ['João', 'Maria'] } });
+    expect(api.completed.at(-1)).toEqual({ id: 'entry-1', details: { participantStudentIds: ['student-1', 'student-2'] } });
   });
 
-  it('manages participant names and validates completion form', async () => {
+  it('shows loading state while fetching students for the completion dialog', async () => {
     const original = entry({ id: 'entry-1' });
-    const { fixture, component } = await renderPage(adminUser, [original], [workout()]);
+    const studentApi = new FakeStudentApi([student()]);
+    studentApi.listGate = pendingPromise();
+    const { fixture, component } = await renderPage(adminUser, [original], [workout()], undefined, undefined, studentApi);
+
+    component.completionEntry = original;
+    component.completeDialogOpen.set(true);
+    const loading = component.loadCompletionStudents();
+    fixture.detectChanges();
+
+    expect(component.completionStudentsLoading()).toBe(true);
+    expect(fixture.nativeElement.textContent).toContain('Carregando alunos');
+
+    studentApi.listGate.resolve();
+    await loading;
+    fixture.detectChanges();
+    expect(component.completionStudentsLoading()).toBe(false);
+  });
+
+  it('shows an error state when students fail to load for the completion dialog', async () => {
+    const original = entry({ id: 'entry-1' });
+    const studentApi = new FakeStudentApi([]);
+    studentApi.listError = new HttpErrorResponse({ status: 500, statusText: 'Server Error' });
+    const { fixture, component } = await renderPage(adminUser, [original], [workout()], undefined, undefined, studentApi);
 
     component.confirmComplete(original);
-    component.completionForm.participantName = ' João ';
-    component.addParticipantName();
-    component.completionForm.participantName = 'João';
-    component.addParticipantName();
-    expect(component.completionForm.participantNames).toEqual(['João', 'João']);
+    await component.loadCompletionStudents();
+    fixture.detectChanges();
 
-    component.removeParticipantName(0);
-    expect(component.completionForm.participantNames).toEqual(['João']);
+    expect(fixture.nativeElement.textContent).toContain('Não foi possível carregar os alunos. Tente novamente.');
+  });
 
-    component.completionForm.participantCount = '2.5';
-    expect(component.completionFormValid()).toBe(false);
-    component.completionForm.participantCount = '501';
-    expect(component.completionFormValid()).toBe(false);
-    component.completionForm.participantCount = '';
+  it('shows an empty state when there are no active students for the completion dialog', async () => {
+    const original = entry({ id: 'entry-1' });
+    const studentApi = new FakeStudentApi([student({ active: false })]);
+    const { fixture, component } = await renderPage(adminUser, [original], [workout()], undefined, undefined, studentApi);
+
+    component.confirmComplete(original);
+    await component.loadCompletionStudents();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Nenhum aluno ativo cadastrado');
+  });
+
+  it('searches active students, prevents duplicate selection and validates completion form', async () => {
+    const original = entry({ id: 'entry-1' });
+    const joao = student({ id: 'student-1', name: 'João Silva' });
+    const inactiveStudent = student({ id: 'student-2', name: 'Maria Inativa', active: false });
+    const studentApi = new FakeStudentApi([joao, inactiveStudent]);
+    const { component } = await renderPage(adminUser, [original], [workout()], undefined, undefined, studentApi);
+
+    component.confirmComplete(original);
+    await component.loadCompletionStudents();
+
+    expect(component.filteredCompletionStudents()).toEqual([joao]);
+
+    component.completionForm.studentSearch = 'joão';
+    expect(component.filteredCompletionStudents()).toEqual([joao]);
+
+    component.completionForm.studentSearch = 'inativa';
+    expect(component.filteredCompletionStudents()).toEqual([]);
+
+    component.completionForm.studentSearch = '';
+    component.selectStudent(joao);
+    expect(component.completionForm.selectedStudents).toEqual([joao]);
+    expect(component.filteredCompletionStudents()).toEqual([]);
+
+    component.selectStudent(joao);
+    expect(component.completionForm.selectedStudents).toEqual([joao]);
+
+    component.removeSelectedStudent(0);
+    expect(component.completionForm.selectedStudents).toEqual([]);
+
     expect(component.completionFormValid()).toBe(true);
-
-    component.completionForm.participantName = '   ';
-    component.addParticipantName();
-    fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toContain('Informe o nome antes de adicionar.');
+    component.completionForm.notes = 'a'.repeat(2001);
+    expect(component.completionFormValid()).toBe(false);
   });
 
-  it('shows added participant names in the dialog and keeps order including duplicates', async () => {
+  it('shows selected students in the dialog and keeps selection order', async () => {
     const original = entry({ id: 'entry-1' });
     const api = new FakeScheduleApi([original]);
-    const { fixture, component } = await renderPage(adminUser, [original], [workout()], api);
+    const joao = student({ id: 'student-1', name: 'Alexandre Denicol' });
+    const alan = student({ id: 'student-2', name: 'Alan Fogaça' });
+    const studentApi = new FakeStudentApi([joao, alan]);
+    const { fixture, component } = await renderPage(adminUser, [original], [workout()], api, undefined, studentApi);
 
     component.confirmComplete(original);
+    await component.loadCompletionStudents();
     fixture.detectChanges();
 
-    setInputValue(fixture.nativeElement.querySelector('input[name="participant-name"]'), 'Alexandre Denicol');
-    clickButton(fixture.nativeElement, 'Adicionar');
+    setInputValue(fixture.nativeElement.querySelector('input[name="student-search"]'), 'Alexandre');
+    fixture.detectChanges();
+    clickButton(fixture.nativeElement, 'Alexandre Denicol');
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.textContent).toContain('Participantes adicionados');
-    expect(fixture.nativeElement.textContent).toContain('1.');
+    expect(fixture.nativeElement.textContent).toContain('Participantes selecionados (1)');
     expect(fixture.nativeElement.textContent).toContain('Alexandre Denicol');
-    expect((fixture.nativeElement.querySelector('input[name="participant-name"]') as HTMLInputElement).value).toBe('');
+    expect((fixture.nativeElement.querySelector('input[name="student-search"]') as HTMLInputElement).value).toBe('');
     expect(api.completed).toHaveLength(0);
 
-    setInputValue(fixture.nativeElement.querySelector('input[name="participant-name"]'), 'Alan Fogaça');
-    clickButton(fixture.nativeElement, 'Adicionar');
-    setInputValue(fixture.nativeElement.querySelector('input[name="participant-name"]'), 'Alan Fogaça');
-    clickButton(fixture.nativeElement, 'Adicionar');
+    clickButton(fixture.nativeElement, 'Alan Fogaça');
     fixture.detectChanges();
 
     const text = fixture.nativeElement.textContent;
+    expect(text).toContain('Participantes selecionados (2)');
     expect(text.indexOf('Alexandre Denicol')).toBeLessThan(text.indexOf('Alan Fogaça'));
-    expect(component.completionForm.participantNames).toEqual(['Alexandre Denicol', 'Alan Fogaça', 'Alan Fogaça']);
+    expect(component.completionForm.selectedStudents.map((s: Student) => s.id)).toEqual(['student-1', 'student-2']);
   });
 
-  it('adds participant with ENTER without completing training', async () => {
+  it('removes only the selected participant without completing training', async () => {
     const original = entry({ id: 'entry-1' });
     const api = new FakeScheduleApi([original]);
-    const { fixture, component } = await renderPage(adminUser, [original], [workout()], api);
+    const joao = student({ id: 'student-1', name: 'Alexandre Denicol' });
+    const alan = student({ id: 'student-2', name: 'Alan Fogaça' });
+    const maria = student({ id: 'student-3', name: 'Maria' });
+    const studentApi = new FakeStudentApi([joao, alan, maria]);
+    const { fixture, component } = await renderPage(adminUser, [original], [workout()], api, undefined, studentApi);
 
     component.confirmComplete(original);
-    fixture.detectChanges();
-    const input = fixture.nativeElement.querySelector('input[name="participant-name"]') as HTMLInputElement;
-    setInputValue(input, 'Alexandre Denicol');
-    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
-    fixture.detectChanges();
-
-    expect(component.completionForm.participantNames).toEqual(['Alexandre Denicol']);
-    expect(fixture.nativeElement.textContent).toContain('Alexandre Denicol');
-    expect(api.completed).toHaveLength(0);
-  });
-
-  it('removes only the selected participant without completing or changing count', async () => {
-    const original = entry({ id: 'entry-1' });
-    const api = new FakeScheduleApi([original]);
-    const { fixture, component } = await renderPage(adminUser, [original], [workout()], api);
-
-    component.confirmComplete(original);
-    component.completionForm = {
-      participantCount: '10',
-      participantName: '',
-      participantNames: ['Alexandre Denicol', 'Alan Fogaça', 'Maria'],
-      notes: '',
-    };
+    await component.loadCompletionStudents();
+    component.completionForm.selectedStudents = [joao, alan, maria];
     fixture.detectChanges();
 
     const removeAlan = fixture.nativeElement.querySelector('button[aria-label="Remover participante Alan Fogaça"]') as HTMLButtonElement;
     removeAlan.click();
     fixture.detectChanges();
 
-    expect(component.completionForm.participantCount).toBe('10');
-    expect(component.completionForm.participantNames).toEqual(['Alexandre Denicol', 'Maria']);
-    expect(fixture.nativeElement.textContent).toContain('Alexandre Denicol');
-    expect(fixture.nativeElement.textContent).toContain('Maria');
-    expect(fixture.nativeElement.textContent).not.toContain('Alan Fogaça');
+    expect(component.completionForm.selectedStudents.map((s: Student) => s.id)).toEqual(['student-1', 'student-3']);
+    const selectedListText = fixture.nativeElement.querySelector('.participant-list')?.textContent ?? '';
+    expect(selectedListText).toContain('Alexandre Denicol');
+    expect(selectedListText).toContain('Maria');
+    expect(selectedListText).not.toContain('Alan Fogaça');
     expect(api.completed).toHaveLength(0);
   });
 
   it('final completion button submits exactly once with participant details and refreshes agenda', async () => {
     const original = entry({ id: 'entry-1' });
     const api = new FakeScheduleApi([original]);
-    const { fixture, component } = await renderPage(adminUser, [original], [workout()], api);
+    const joao = student({ id: 'student-1', name: 'Alexandre Denicol' });
+    const alan = student({ id: 'student-2', name: 'Alan Fogaça' });
+    const studentApi = new FakeStudentApi([joao, alan]);
+    const { fixture, component } = await renderPage(adminUser, [original], [workout()], api, undefined, studentApi);
 
     component.confirmComplete(original);
-    component.completionForm = {
-      participantCount: 2,
-      participantName: '',
-      participantNames: ['Alexandre Denicol', 'Alan Fogaça'],
-      notes: '  Boa resposta da turma.\nLinha 2  ',
-    };
+    await component.loadCompletionStudents();
+    component.completionForm.selectedStudents = [joao, alan];
+    component.completionForm.notes = '  Boa resposta da turma.\nLinha 2  ';
     const previousLoadCount = api.ranges.length;
     fixture.detectChanges();
 
@@ -430,15 +464,14 @@ describe('SchedulePage', () => {
       {
         id: 'entry-1',
         details: {
-          participantCount: 2,
-          participantNames: ['Alexandre Denicol', 'Alan Fogaça'],
+          participantStudentIds: ['student-1', 'student-2'],
           notes: 'Boa resposta da turma.\nLinha 2',
         },
       },
     ]);
     expect(api.ranges.length).toBeGreaterThan(previousLoadCount);
     expect(component.completeDialogOpen()).toBe(false);
-    expect(component.completionForm).toEqual({ participantCount: '', participantName: '', participantNames: [], notes: '' });
+    expect(component.completionForm).toEqual({ studentSearch: '', selectedStudents: [], notes: '' });
     expect(fixture.nativeElement.textContent).toContain('Treino registrado como realizado.');
   });
 
@@ -598,9 +631,9 @@ describe('SchedulePage', () => {
     expect(component.editForm).toEqual({ scheduledDate: '', workoutId: '' });
 
     component.confirmComplete(original);
-    component.completionForm = { participantCount: '12', participantName: 'Maria', participantNames: ['João'], notes: 'Observação temporária' };
+    component.completionForm = { studentSearch: 'Mar', selectedStudents: [student({ id: 'student-1', name: 'João' })], notes: 'Observação temporária' };
     component.closeCompleteDialog();
-    expect(component.completionForm).toEqual({ participantCount: '', participantName: '', participantNames: [], notes: '' });
+    expect(component.completionForm).toEqual({ studentSearch: '', selectedStudents: [], notes: '' });
   });
 });
 
@@ -610,6 +643,7 @@ async function renderPage(
   workouts: WorkoutListItem[],
   api = new FakeScheduleApi(entries),
   workoutApi = new FakeWorkoutApi(workouts),
+  studentApi = new FakeStudentApi([]),
 ) {
   TestBed.resetTestingModule();
 
@@ -620,6 +654,7 @@ async function renderPage(
       provideRouter([]),
       { provide: ScheduleApiService, useValue: api },
       { provide: WorkoutApiService, useValue: workoutApi },
+      { provide: StudentApiService, useValue: studentApi },
       {
         provide: AuthService,
         useValue: {
@@ -636,7 +671,7 @@ async function renderPage(
   await component.loadData();
   fixture.detectChanges();
 
-  return { fixture, component, api, workoutApi };
+  return { fixture, component, api, workoutApi, studentApi };
 }
 
 function entry(overrides: Partial<ScheduleEntry> = {}): ScheduleEntry {
@@ -648,6 +683,36 @@ function entry(overrides: Partial<ScheduleEntry> = {}): ScheduleEntry {
     updatedAt: '2026-08-23T00:00:00Z',
     ...overrides,
   };
+}
+
+function student(overrides: Partial<Student> = {}): Student {
+  return {
+    id: 'student-id',
+    name: 'Aluno Padrão',
+    active: true,
+    createdAt: '2026-08-23T00:00:00Z',
+    updatedAt: '2026-08-23T00:00:00Z',
+    ...overrides,
+  };
+}
+
+class FakeStudentApi {
+  listCalls = 0;
+  listError: unknown = null;
+  listGate: DeferredPromise | null = null;
+
+  constructor(private students: Student[]) {}
+
+  async list(): Promise<Student[]> {
+    this.listCalls += 1;
+    if (this.listGate) {
+      await this.listGate.promise;
+    }
+    if (this.listError) {
+      throw this.listError;
+    }
+    return this.students;
+  }
 }
 
 function workout(overrides: Partial<WorkoutListItem> = {}): WorkoutListItem {

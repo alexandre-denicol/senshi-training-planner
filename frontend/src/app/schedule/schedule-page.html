@@ -216,58 +216,61 @@
         <p>{{ formatDate(entry.scheduledDate) }}</p>
       </div>
 
-      <label>
-        <span>Quantidade de alunos</span>
-        <input
-          #participantCountInput
-          pInputText
-          type="number"
-          name="participant-count"
-          inputmode="numeric"
-          min="0"
-          max="500"
-          step="1"
-          autocomplete="off"
-          [value]="completionForm.participantCount ?? ''"
-          (input)="completionForm.participantCount = participantCountInput.value"
-        />
-      </label>
-
       <div class="participant-editor">
         <span class="field-label">Participantes (opcional)</span>
-        <div class="participant-add-row">
+
+        @if (completionStudentsLoading()) {
+          <div class="detail-loading" role="status" aria-label="Carregando alunos">
+            <span class="loading-indicator" aria-hidden="true"></span>
+            <p>Carregando alunos...</p>
+          </div>
+        } @else if (completionStudentsError()) {
+          <p class="dialog-error" role="alert">{{ completionStudentsError() }}</p>
+        } @else if (!hasActiveCompletionStudents()) {
+          <p class="student-search-empty">Nenhum aluno ativo cadastrado. Cadastre alunos na área Alunos para registrá-los aqui.</p>
+        } @else {
           <input
-            #participantNameInput
+            #studentSearchInput
             pInputText
             type="text"
-            name="participant-name"
-            maxlength="120"
+            name="student-search"
             autocomplete="off"
-            aria-label="Nome do participante"
-            [value]="completionForm.participantName"
-            (input)="completionForm.participantName = participantNameInput.value"
-            (keydown.enter)="addParticipantNameFromKeyboard($event, participantNameInput)"
+            placeholder="Buscar aluno pelo nome"
+            aria-label="Buscar aluno pelo nome"
+            [value]="completionForm.studentSearch"
+            (input)="completionForm.studentSearch = studentSearchInput.value"
           />
-          <button pButton type="button" class="secondary-action" (click)="addParticipantName(participantNameInput)" [disabled]="submitting()">
-            <i class="pi pi-plus" aria-hidden="true"></i>
-            <span>Adicionar</span>
-          </button>
-        </div>
 
-        @if (completionForm.participantNames.length > 0) {
-          <span class="participant-list-title">Participantes adicionados</span>
+          @if (filteredCompletionStudents().length > 0) {
+            <ul class="student-search-results">
+              @for (student of filteredCompletionStudents(); track student.id) {
+                <li>
+                  <button type="button" class="student-result-button" (click)="selectStudent(student)" [disabled]="submitting()">
+                    <i class="pi pi-plus" aria-hidden="true"></i>
+                    <span>{{ student.name }}</span>
+                  </button>
+                </li>
+              }
+            </ul>
+          } @else if (completionForm.studentSearch.trim() !== '') {
+            <p class="student-search-empty">Nenhum aluno ativo encontrado.</p>
+          }
+        }
+
+        @if (completionForm.selectedStudents.length > 0) {
+          <span class="participant-list-title">Participantes selecionados ({{ completionForm.selectedStudents.length }})</span>
           <ol class="participant-list">
-            @for (name of completionForm.participantNames; track $index) {
+            @for (student of completionForm.selectedStudents; track student.id) {
               <li>
                 <span class="participant-position">{{ $index + 1 }}.</span>
-                <span class="participant-name">{{ name }}</span>
+                <span class="participant-name">{{ student.name }}</span>
                 <button
                   pButton
                   type="button"
                   class="icon-action danger"
-                  [attr.aria-label]="'Remover participante ' + name"
+                  [attr.aria-label]="'Remover participante ' + student.name"
                   title="Remover"
-                  (click)="removeParticipantName($index)"
+                  (click)="removeSelectedStudent($index)"
                   [disabled]="submitting()"
                 >
                   <i class="pi pi-times" aria-hidden="true"></i>
@@ -277,10 +280,6 @@
           </ol>
         }
       </div>
-
-      @if (completionFormError()) {
-        <p class="dialog-error" role="alert">{{ completionFormError() }}</p>
-      }
 
       <label>
         <span>Observações (opcional)</span>

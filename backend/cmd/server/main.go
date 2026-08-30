@@ -16,6 +16,7 @@ import (
 	"github.com/alexandre/senshi-training-planner/backend/internal/history"
 	"github.com/alexandre/senshi-training-planner/backend/internal/professors"
 	"github.com/alexandre/senshi-training-planner/backend/internal/schedule"
+	"github.com/alexandre/senshi-training-planner/backend/internal/students"
 	"github.com/alexandre/senshi-training-planner/backend/internal/workouts"
 )
 
@@ -46,6 +47,9 @@ func main() {
 	blockStore := blocks.NewPostgresStore(pool)
 	blockService := blocks.NewService(blockStore)
 	blockHandler := blocks.NewHandler(blockService)
+	studentStore := students.NewPostgresStore(pool)
+	studentService := students.NewService(studentStore)
+	studentHandler := students.NewHandler(studentService)
 	workoutStore := workouts.NewPostgresStore(pool)
 	workoutService := workouts.NewService(workoutStore)
 	workoutHandler := workouts.NewHandler(workoutService)
@@ -71,6 +75,8 @@ func main() {
 	mux.Handle("/categories/", authenticated(http.HandlerFunc(categoryHandler.Resource)))
 	mux.Handle("/blocks", authenticated(http.HandlerFunc(blockHandler.Collection)))
 	mux.Handle("/blocks/", authenticated(http.HandlerFunc(blockHandler.Resource)))
+	mux.Handle("/students", authenticated(http.HandlerFunc(studentHandler.Collection)))
+	mux.Handle("/students/", authenticated(http.HandlerFunc(studentHandler.Resource)))
 	mux.Handle("/workouts", authenticated(http.HandlerFunc(workoutHandler.Collection)))
 	mux.Handle("/workouts/", authenticated(http.HandlerFunc(workoutHandler.Resource)))
 	mux.Handle("/schedule", authenticated(http.HandlerFunc(scheduleHandler.Collection)))
