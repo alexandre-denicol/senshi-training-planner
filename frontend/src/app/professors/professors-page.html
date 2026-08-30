@@ -31,10 +31,10 @@
       </div>
     } @else if (!hasProfessors()) {
       <div class="empty-list">
-        <p>Nenhum professor cadastrado.</p>
+        <p>Você ainda não cadastrou nenhum professor.</p>
         <button pButton type="button" (click)="openCreateDialog()">
           <i class="pi pi-plus" aria-hidden="true"></i>
-          <span>Novo professor</span>
+          <span>Criar primeiro professor</span>
         </button>
       </div>
     } @else {
@@ -50,7 +50,7 @@
         </thead>
         <tbody>
           @for (professor of professors(); track professor.id) {
-            <tr>
+            <tr [class.inactive-row]="!professor.active">
               <td>{{ professor.name }}</td>
               <td>{{ professor.email }}</td>
               <td>
@@ -189,6 +189,8 @@
         name="create-name"
         autocomplete="name"
         required
+        autofocus
+        [maxlength]="maxNameLength"
         [(ngModel)]="createForm.name"
       />
     </label>
@@ -263,6 +265,8 @@
         name="edit-name"
         autocomplete="name"
         required
+        autofocus
+        [maxlength]="maxNameLength"
         [(ngModel)]="editForm.name"
       />
     </label>
@@ -312,6 +316,7 @@
         name="reset-password"
         autocomplete="new-password"
         required
+        autofocus
         [(ngModel)]="passwordForm.password"
       />
     </label>

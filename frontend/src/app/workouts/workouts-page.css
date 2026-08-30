@@ -207,6 +207,28 @@ dt {
   padding: 1rem;
 }
 
+.selected-blocks {
+  border: 1px solid #2a3039;
+  border-radius: 6px;
+  list-style: none;
+  margin: 0;
+  overflow: hidden;
+  padding: 0;
+}
+
+.selected-blocks .selected-block:last-child {
+  border-bottom: 0;
+}
+
+.block-description-preview {
+  color: #94a3b8;
+  display: block;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  margin-top: 0.2rem;
+  overflow-wrap: anywhere;
+}
+
 .workout-card h2,
 .selected-block h3,
 .builder-heading h2,
@@ -255,6 +277,30 @@ dd {
 .dialog-form textarea {
   line-height: 1.5;
   resize: vertical;
+}
+
+.notes-counter {
+  color: #94a3b8;
+  font-size: 0.78rem;
+  justify-self: end;
+  margin-top: -0.55rem;
+}
+
+.dialog-error {
+  color: #fecaca;
+  margin: 0;
+}
+
+.sequence-count {
+  color: #94a3b8;
+  font-size: 0.78rem;
+  font-weight: 700;
+  margin-top: -0.3rem;
+}
+
+p.add-block-summary {
+  color: #7c8797;
+  font-size: 0.82rem;
 }
 
 .builder-heading,
@@ -422,8 +468,7 @@ dd {
   color: #e2e8f0;
 }
 
-.confirmation-body p,
-.form-hint {
+.confirmation-body p {
   color: #dbe5f3;
   line-height: 1.5;
   margin: 0;

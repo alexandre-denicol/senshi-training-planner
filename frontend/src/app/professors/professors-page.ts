@@ -33,6 +33,8 @@ export class ProfessorsPage implements OnInit {
   private readonly router = inject(Router);
   private readonly dateFormatter = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' });
 
+  protected readonly maxNameLength = 120;
+
   protected readonly professors = signal<Professor[]>([]);
   protected readonly loading = signal(true);
   protected readonly submitting = signal(false);

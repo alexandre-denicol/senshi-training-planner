@@ -25,6 +25,11 @@ interface BlockForm {
   sequenceText: string;
 }
 
+const MAX_NAME_LENGTH = 120;
+const MAX_DESCRIPTION_LENGTH = 2000;
+const MAX_SEQUENCE_TEXT_LENGTH = 160;
+const MAX_SEQUENCE_ITEMS = 40;
+
 @Component({
   imports: [ButtonModule, CommonModule, DialogModule, FormsModule, InputTextModule],
   selector: 'app-blocks-page',
@@ -45,9 +50,15 @@ export class BlocksPage implements OnInit {
   protected readonly errorMessage = signal('');
   protected readonly successMessage = signal('');
   protected readonly confirmation = signal<ConfirmationState | null>(null);
+  protected readonly sequenceError = signal('');
   protected readonly hasBlocks = computed(() => this.blocks().length > 0);
   protected readonly activeCategories = computed(() => this.categories().filter((category) => category.active));
   protected readonly hasActiveCategories = computed(() => this.activeCategories().length > 0);
+
+  protected readonly maxNameLength = MAX_NAME_LENGTH;
+  protected readonly maxDescriptionLength = MAX_DESCRIPTION_LENGTH;
+  protected readonly maxSequenceTextLength = MAX_SEQUENCE_TEXT_LENGTH;
+  protected readonly maxSequenceItems = MAX_SEQUENCE_ITEMS;
 
   protected createDialogOpen = false;
   protected editDialogOpen = false;
@@ -85,12 +96,14 @@ export class BlocksPage implements OnInit {
     }
 
     this.createForm = this.emptyForm();
+    this.sequenceError.set('');
     this.createDialogOpen = true;
   }
 
   protected closeCreateDialog(): void {
     this.createDialogOpen = false;
     this.createForm = this.emptyForm();
+    this.sequenceError.set('');
   }
 
   protected openEditDialog(block: Block): void {
@@ -103,6 +116,7 @@ export class BlocksPage implements OnInit {
       sequence: block.sequence.slice().sort((first, second) => first.position - second.position).map((item) => item.text),
       sequenceText: '',
     };
+    this.sequenceError.set('');
     this.editDialogOpen = true;
   }
 
@@ -110,6 +124,7 @@ export class BlocksPage implements OnInit {
     this.editDialogOpen = false;
     this.selectedBlock = null;
     this.editForm = this.emptyForm();
+    this.sequenceError.set('');
   }
 
   protected formValid(form: BlockForm): boolean {
@@ -118,7 +133,17 @@ export class BlocksPage implements OnInit {
 
   protected addSequenceItem(form: BlockForm, input?: HTMLInputElement): void {
     const text = (input?.value ?? form.sequenceText).trim();
+    this.sequenceError.set('');
+
     if (text === '') {
+      return;
+    }
+    if (Array.from(text).length > MAX_SEQUENCE_TEXT_LENGTH) {
+      this.sequenceError.set(`Use no máximo ${MAX_SEQUENCE_TEXT_LENGTH} caracteres por item.`);
+      return;
+    }
+    if (form.sequence.length >= MAX_SEQUENCE_ITEMS) {
+      this.sequenceError.set(`Use no máximo ${MAX_SEQUENCE_ITEMS} itens na sequência.`);
       return;
     }
 
@@ -126,6 +151,7 @@ export class BlocksPage implements OnInit {
     form.sequenceText = '';
     if (input) {
       input.value = '';
+      input.focus();
     }
   }
 
@@ -136,6 +162,11 @@ export class BlocksPage implements OnInit {
 
   protected removeSequenceItem(form: BlockForm, index: number): void {
     form.sequence = form.sequence.filter((_, currentIndex) => currentIndex !== index);
+    this.sequenceError.set('');
+  }
+
+  protected descriptionCounter(form: BlockForm): string {
+    return `${Array.from(form.description).length} / ${MAX_DESCRIPTION_LENGTH}`;
   }
 
   protected moveSequenceItemUp(form: BlockForm, index: number): void {

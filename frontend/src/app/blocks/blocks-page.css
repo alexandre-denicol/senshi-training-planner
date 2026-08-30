@@ -146,6 +146,15 @@ h1 {
   color: #cbd5e1;
 }
 
+.inactive-row {
+  opacity: 0.6;
+}
+
+.inactive-row .row-actions,
+.inactive-row .card-actions {
+  opacity: 1;
+}
+
 .loading-indicator {
   animation: spin 800ms linear infinite;
   border: 3px solid #343a45;
@@ -254,6 +263,18 @@ dd {
   white-space: pre-wrap;
 }
 
+.notes-counter {
+  color: #94a3b8;
+  font-size: 0.78rem;
+  justify-self: end;
+  margin-top: -0.55rem;
+}
+
+.dialog-error {
+  color: #fecaca;
+  margin: 0;
+}
+
 .sequence-editor {
   background: #14171c;
   border: 1px solid #2a3039;
@@ -287,12 +308,27 @@ dd {
   gap: 0.45rem;
 }
 
+.sequence-count {
+  color: #94a3b8;
+  font-size: 0.78rem;
+  font-weight: 700;
+  margin-top: -0.3rem;
+}
+
+.sequence-empty {
+  color: #7c8797;
+  font-size: 0.88rem;
+  margin: 0;
+}
+
 .sequence-list {
   display: grid;
   gap: 0.45rem;
   list-style: none;
   margin: 0;
-  padding: 0;
+  max-height: min(40vh, 19rem);
+  overflow-y: auto;
+  padding: 0 0.1rem 0.1rem 0;
 }
 
 .sequence-list li {

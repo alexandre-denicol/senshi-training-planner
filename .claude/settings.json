@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(OUT_DIR=/tmp/claude-1001/-home-alexandre-projetos-senshi-training-planner/28ec3d77-2071-478c-88c1-1fa7d70835c1/scratchpad/screens node blocks-viewport.tmp.mjs)",
+      "Bash(OUT_DIR=/tmp/claude-1001/-home-alexandre-projetos-senshi-training-planner/28ec3d77-2071-478c-88c1-1fa7d70835c1/scratchpad/screens node blocks-scroll-test.tmp.mjs)",
+      "Bash(xargs -I{} echo {})"
+    ]
+  }
+}

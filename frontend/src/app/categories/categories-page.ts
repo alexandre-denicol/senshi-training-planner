@@ -27,6 +27,8 @@ export class CategoriesPage implements OnInit {
   private readonly router = inject(Router);
   private readonly dateFormatter = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' });
 
+  protected readonly maxNameLength = 120;
+
   protected readonly categories = signal<Category[]>([]);
   protected readonly loading = signal(true);
   protected readonly submitting = signal(false);

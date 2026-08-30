@@ -33,6 +33,11 @@ interface BlockForm {
   sequenceText: string;
 }
 
+const MAX_NAME_LENGTH = 120;
+const MAX_DESCRIPTION_LENGTH = 2000;
+const MAX_SEQUENCE_TEXT_LENGTH = 160;
+const MAX_SEQUENCE_ITEMS = 40;
+
 @Component({
   imports: [ButtonModule, CommonModule, DialogModule, FormsModule, InputTextModule],
   selector: 'app-workouts-page',
@@ -61,12 +66,18 @@ export class WorkoutsPage implements OnInit {
   protected readonly addBlockFeedback = signal('');
   protected readonly categoryErrorMessage = signal('');
   protected readonly scheduleErrorMessage = signal('');
+  protected readonly blockSequenceError = signal('');
   protected readonly confirmation = signal<ConfirmationState | null>(null);
   protected readonly hasWorkouts = computed(() => this.workouts().length > 0);
   protected readonly activeBlocks = computed(() => this.blocks().filter((block) => block.active));
   protected readonly hasActiveBlocks = computed(() => this.activeBlocks().length > 0);
   protected readonly activeCategories = computed(() => this.categories().filter((category) => category.active));
   protected readonly hasActiveCategories = computed(() => this.activeCategories().length > 0);
+
+  protected readonly maxNameLength = MAX_NAME_LENGTH;
+  protected readonly maxDescriptionLength = MAX_DESCRIPTION_LENGTH;
+  protected readonly maxSequenceTextLength = MAX_SEQUENCE_TEXT_LENGTH;
+  protected readonly maxSequenceItems = MAX_SEQUENCE_ITEMS;
 
   protected createDialogOpen = false;
   protected editDialogOpen = false;
@@ -192,6 +203,15 @@ export class WorkoutsPage implements OnInit {
     this.addBlockMode = 'create';
   }
 
+  protected addBlockDialogSummary(): string {
+    const count = this.activeBuilderForm?.blocks.length ?? 0;
+    if (count === 0) {
+      return 'Nenhum bloco adicionado ao treino ainda.';
+    }
+
+    return count === 1 ? '1 bloco já adicionado ao treino.' : `${count} blocos já adicionados ao treino.`;
+  }
+
   protected showBlockSelection(): void {
     this.clearContextMessages();
     this.addBlockMode = 'select';
@@ -217,7 +237,17 @@ export class WorkoutsPage implements OnInit {
 
   protected addBlockSequenceItem(input?: HTMLInputElement): void {
     const text = this.blockCreateForm.sequenceText.trim();
+    this.blockSequenceError.set('');
+
     if (text === '') {
+      return;
+    }
+    if (Array.from(text).length > MAX_SEQUENCE_TEXT_LENGTH) {
+      this.blockSequenceError.set(`Use no máximo ${MAX_SEQUENCE_TEXT_LENGTH} caracteres por item.`);
+      return;
+    }
+    if (this.blockCreateForm.sequence.length >= MAX_SEQUENCE_ITEMS) {
+      this.blockSequenceError.set(`Use no máximo ${MAX_SEQUENCE_ITEMS} itens na sequência.`);
       return;
     }
 
@@ -233,6 +263,11 @@ export class WorkoutsPage implements OnInit {
 
   protected removeBlockSequenceItem(index: number): void {
     this.blockCreateForm.sequence = this.blockCreateForm.sequence.filter((_, itemIndex) => itemIndex !== index);
+    this.blockSequenceError.set('');
+  }
+
+  protected blockDescriptionCounter(): string {
+    return `${Array.from(this.blockCreateForm.description).length} / ${MAX_DESCRIPTION_LENGTH}`;
   }
 
   protected moveBlockSequenceItemUp(index: number): void {
@@ -645,6 +680,7 @@ export class WorkoutsPage implements OnInit {
     this.addBlockErrorMessage.set('');
     this.addBlockFeedback.set('');
     this.categoryErrorMessage.set('');
+    this.blockSequenceError.set('');
   }
 
   private emptyForm(): WorkoutForm {

@@ -102,8 +102,7 @@ h1 {
 
 .date-group header span,
 .history-card p,
-dt,
-.snapshot-blocks p {
+dt {
   color: #94a3b8;
 }
 
@@ -138,10 +137,24 @@ dt,
 .history-detail h2,
 .participation-section h3,
 .notes-section h3,
-.snapshot-blocks h3 {
+.blocks-section h3 {
   color: #fff;
   font-size: 1rem;
   margin: 0;
+}
+
+.snapshot-blocks h4 {
+  color: #fff;
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.snapshot-category {
+  color: #94a3b8;
+  display: block;
+  font-size: 0.85rem;
+  margin-top: 0.2rem;
+  overflow-wrap: anywhere;
 }
 
 .history-meta {
@@ -222,6 +235,11 @@ dd {
   margin: 0;
 }
 
+.blocks-section {
+  display: grid;
+  gap: 0.55rem;
+}
+
 .snapshot-blocks {
   display: grid;
   gap: 0.65rem;
@@ -240,7 +258,8 @@ dd {
 }
 
 .participation-section p,
-.notes-section p {
+.notes-section p,
+.blocks-section > p {
   color: #dbe5f3;
   margin: 0;
 }

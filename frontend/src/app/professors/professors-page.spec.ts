@@ -8,7 +8,7 @@ describe('ProfessorsPage', () => {
   it('shows empty list state', async () => {
     const { fixture } = await renderPage([]);
 
-    expect(fixture.nativeElement.textContent).toContain('Nenhum professor cadastrado.');
+    expect(fixture.nativeElement.textContent).toContain('Você ainda não cadastrou nenhum professor.');
   });
 
   it('shows populated professor list without password fields', async () => {
@@ -121,7 +121,7 @@ describe('ProfessorsPage', () => {
     fixture.detectChanges();
 
     expect(api.deleted).toEqual(['prof-1']);
-    expect(fixture.nativeElement.textContent).toContain('Nenhum professor cadastrado.');
+    expect(fixture.nativeElement.textContent).toContain('Você ainda não cadastrou nenhum professor.');
   });
 
   it('clears passwords when dialogs close', async () => {
