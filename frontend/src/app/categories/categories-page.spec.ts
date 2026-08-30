@@ -8,7 +8,7 @@ describe('CategoriesPage', () => {
   it('shows empty state', async () => {
     const { fixture } = await renderPage([]);
 
-    expect(fixture.nativeElement.textContent).toContain('Nenhuma categoria cadastrada.');
+    expect(fixture.nativeElement.textContent).toContain('Você ainda não cadastrou nenhuma categoria.');
   });
 
   it('shows populated category list', async () => {
@@ -98,7 +98,7 @@ describe('CategoriesPage', () => {
     fixture.detectChanges();
 
     expect(api.deleted).toEqual(['cat-1']);
-    expect(fixture.nativeElement.textContent).toContain('Nenhuma categoria cadastrada.');
+    expect(fixture.nativeElement.textContent).toContain('Você ainda não cadastrou nenhuma categoria.');
   });
 
   it('shows safe message when category delete is blocked by blocks', async () => {

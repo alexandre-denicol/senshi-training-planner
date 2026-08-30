@@ -569,8 +569,13 @@ textarea:focus-visible {
     display: grid;
   }
 
+  .entry-card {
+    grid-template-columns: 1fr;
+  }
+
   .row-actions {
-    display: grid;
+    display: flex;
+    flex-wrap: wrap;
     justify-content: flex-start;
   }
 

@@ -123,6 +123,10 @@ export class HistoryPage implements OnInit {
     return item.blockCount === 1 ? '1 bloco' : `${item.blockCount} blocos`;
   }
 
+  protected blocksSnapshotCountLabel(detail: HistoryDetail): string {
+    return detail.blocks.length === 1 ? '1 bloco registrado' : `${detail.blocks.length} blocos registrados`;
+  }
+
   protected participantCountLabel(count: number | null | undefined): string {
     if (count === null || count === undefined) {
       return '';

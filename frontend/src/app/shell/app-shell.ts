@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, ElementRef, HostListener, ViewChild, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
 import { AuthService } from '../auth/auth.service';
@@ -32,6 +32,8 @@ export class AppShell {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
 
+  @ViewChild('menuButton') private readonly menuButton?: ElementRef<HTMLButtonElement>;
+
   protected readonly drawerOpen = signal(false);
   protected readonly user = computed(() => this.auth.currentUser() as AuthUser);
   protected readonly visibleNavItems = computed(() => {
@@ -39,8 +41,23 @@ export class AppShell {
     return navItems.filter((item) => !item.adminOnly || user?.role === 'ADMIN');
   });
 
-  protected closeDrawer(): void {
+  @HostListener('document:keydown.escape')
+  protected onEscape(): void {
+    if (this.drawerOpen()) {
+      this.closeDrawer();
+    }
+  }
+
+  protected closeDrawer(restoreFocus = true): void {
+    const wasOpen = this.drawerOpen();
     this.drawerOpen.set(false);
+    if (wasOpen && restoreFocus) {
+      this.menuButton?.nativeElement.focus();
+    }
+  }
+
+  protected closeDrawerAfterNavigation(): void {
+    this.closeDrawer(false);
   }
 
   protected async logout(): Promise<void> {

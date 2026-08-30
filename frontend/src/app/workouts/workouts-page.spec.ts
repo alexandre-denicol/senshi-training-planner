@@ -11,7 +11,7 @@ describe('WorkoutsPage', () => {
   it('shows empty state', async () => {
     const { fixture } = await renderPage([], [block()]);
 
-    expect(fixture.nativeElement.textContent).toContain('Nenhum treino cadastrado.');
+    expect(fixture.nativeElement.textContent).toContain('Você ainda não criou nenhum treino.');
   });
 
   it('shows populated workout list with block count', async () => {
@@ -167,7 +167,7 @@ describe('WorkoutsPage', () => {
     fixture.detectChanges();
 
     expect(api.deleted).toEqual(['workout-1']);
-    expect(fixture.nativeElement.textContent).toContain('Nenhum treino cadastrado.');
+    expect(fixture.nativeElement.textContent).toContain('Você ainda não criou nenhum treino.');
   });
 
   it('shows safe message when workout delete is blocked by agenda', async () => {

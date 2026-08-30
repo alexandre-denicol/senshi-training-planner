@@ -126,30 +126,35 @@
         }
       </section>
 
-      <ol class="snapshot-blocks">
-        @for (block of detail.blocks; track block.position) {
-          <li>
-            <span class="position">{{ block.position }}</span>
-            <div>
-              <h3>{{ block.blockName }}</h3>
-              <p>{{ block.categoryName }}</p>
-              @if (block.description) {
-                <p class="snapshot-description">{{ block.description }}</p>
-              }
-              @if (block.sequence.length > 0) {
-                <ol class="snapshot-sequence">
-                  @for (item of block.sequence; track item.position) {
-                    <li>
-                      <span>{{ item.position }}</span>
-                      <p>{{ item.text }}</p>
-                    </li>
-                  }
-                </ol>
-              }
-            </div>
-          </li>
-        }
-      </ol>
+      <section class="blocks-section">
+        <h3>Blocos do treino</h3>
+        <p>{{ blocksSnapshotCountLabel(detail) }}</p>
+
+        <ol class="snapshot-blocks">
+          @for (block of detail.blocks; track block.position) {
+            <li>
+              <span class="position">{{ block.position }}</span>
+              <div>
+                <h4>{{ block.blockName }}</h4>
+                <small class="snapshot-category">Categoria: {{ block.categoryName }}</small>
+                @if (block.description) {
+                  <p class="snapshot-description">{{ block.description }}</p>
+                }
+                @if (block.sequence.length > 0) {
+                  <ol class="snapshot-sequence">
+                    @for (item of block.sequence; track item.position) {
+                      <li>
+                        <span>{{ item.position }}</span>
+                        <p>{{ item.text }}</p>
+                      </li>
+                    }
+                  </ol>
+                }
+              </div>
+            </li>
+          }
+        </ol>
+      </section>
     </article>
   }
 </p-dialog>

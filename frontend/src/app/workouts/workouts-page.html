@@ -31,10 +31,10 @@
       </div>
     } @else if (!hasWorkouts()) {
       <div class="empty-list">
-        <p>Nenhum treino cadastrado.</p>
+        <p>Você ainda não criou nenhum treino.</p>
         <button pButton type="button" (click)="openCreateDialog()">
           <i class="pi pi-plus" aria-hidden="true"></i>
-          <span>Novo treino</span>
+          <span>Criar primeiro treino</span>
         </button>
       </div>
     } @else {
@@ -197,6 +197,8 @@
       name="workout-name"
       autocomplete="off"
       required
+      autofocus
+      [maxlength]="maxNameLength"
       [(ngModel)]="form.name"
     />
   </label>
@@ -209,7 +211,7 @@
     <div class="builder-heading">
       <div>
         <h2>Blocos do treino</h2>
-        <p>A ordem abaixo será usada na execução do treino.</p>
+        <p>Busque e adicione blocos; a ordem abaixo será usada na execução do treino.</p>
       </div>
       <button pButton type="button" class="secondary-action add-block-action" (click)="openAddBlockDialog(form)">
         <i class="pi pi-plus" aria-hidden="true"></i>
@@ -217,49 +219,52 @@
       </button>
     </div>
 
-    @if (!hasActiveBlocks()) {
+    @if (form.blocks.length === 0) {
       <div class="builder-empty">
-        <p>Nenhum bloco disponível ainda.</p>
-        <button pButton type="button" class="secondary-action" (click)="openAddBlockDialog(form)">
-          <i class="pi pi-plus" aria-hidden="true"></i>
-          <span>Criar primeiro bloco</span>
-        </button>
+        @if (hasActiveBlocks()) {
+          <p>Nenhum bloco adicionado ainda.</p>
+        } @else {
+          <p>Nenhum bloco disponível ainda.</p>
+          <button pButton type="button" class="secondary-action" (click)="openAddBlockDialog(form)">
+            <i class="pi pi-plus" aria-hidden="true"></i>
+            <span>Criar primeiro bloco</span>
+          </button>
+        }
       </div>
+    } @else {
+      <ol class="selected-blocks" aria-label="Blocos selecionados, em ordem">
+        @for (block of form.blocks; track block.id; let index = $index; let first = $first; let last = $last) {
+          <li class="selected-block">
+            <span class="position">{{ index + 1 }}</span>
+            <div>
+              <h3>{{ block.name }}</h3>
+              <p>{{ block.category.name }}</p>
+              @if (block.description) {
+                <small class="block-description-preview">{{ block.description }}</small>
+              }
+              @if (sequencePreview(block)) {
+                <small class="sequence-preview">{{ sequencePreview(block) }}</small>
+              }
+              @if (!block.active) {
+                <span class="inline-badge">Inativo</span>
+              }
+            </div>
+            <div class="selected-actions">
+              <button pButton type="button" class="icon-action" [attr.aria-label]="'Mover ' + block.name + ' para cima'" title="Mover para cima" [disabled]="first" (click)="moveBlockUp(form, index)">
+                <i class="pi pi-arrow-up" aria-hidden="true"></i>
+              </button>
+              <button pButton type="button" class="icon-action" [attr.aria-label]="'Mover ' + block.name + ' para baixo'" title="Mover para baixo" [disabled]="last" (click)="moveBlockDown(form, index)">
+                <i class="pi pi-arrow-down" aria-hidden="true"></i>
+              </button>
+              <button pButton type="button" class="icon-action danger" [attr.aria-label]="'Remover ' + block.name" title="Remover" (click)="removeBlock(form, index)">
+                <i class="pi pi-times" aria-hidden="true"></i>
+              </button>
+            </div>
+          </li>
+        }
+      </ol>
     }
   </section>
-
-  <div class="selected-blocks" aria-label="Blocos selecionados">
-    @if (form.blocks.length === 0) {
-      <p class="form-hint">Adicione pelo menos um bloco.</p>
-    } @else {
-      @for (block of form.blocks; track block.id; let index = $index; let first = $first; let last = $last) {
-        <article class="selected-block">
-          <span class="position">{{ index + 1 }}</span>
-          <div>
-            <h3>{{ block.name }}</h3>
-            <p>{{ block.category.name }}</p>
-            @if (sequencePreview(block)) {
-              <small class="sequence-preview">{{ sequencePreview(block) }}</small>
-            }
-            @if (!block.active) {
-              <span class="inline-badge">Inativo</span>
-            }
-          </div>
-          <div class="selected-actions">
-            <button pButton type="button" class="icon-action" aria-label="Mover bloco para cima" title="Mover para cima" [disabled]="first" (click)="moveBlockUp(form, index)">
-              <i class="pi pi-arrow-up" aria-hidden="true"></i>
-            </button>
-            <button pButton type="button" class="icon-action" aria-label="Mover bloco para baixo" title="Mover para baixo" [disabled]="last" (click)="moveBlockDown(form, index)">
-              <i class="pi pi-arrow-down" aria-hidden="true"></i>
-            </button>
-            <button pButton type="button" class="icon-action danger" aria-label="Remover bloco" title="Remover" (click)="removeBlock(form, index)">
-              <i class="pi pi-times" aria-hidden="true"></i>
-            </button>
-          </div>
-        </article>
-      }
-    }
-  </div>
 </ng-template>
 
 <p-dialog
@@ -285,6 +290,7 @@
         <div>
           <h2>Blocos disponíveis</h2>
           <p>Escolha um bloco ativo para incluir no treino.</p>
+          <p class="add-block-summary">{{ addBlockDialogSummary() }}</p>
         </div>
         <button pButton type="button" class="secondary-action" (click)="showCreateBlock()">
           <i class="pi pi-plus" aria-hidden="true"></i>
@@ -300,13 +306,14 @@
             type="search"
             name="block-search"
             autocomplete="off"
+            placeholder="Nome ou categoria do bloco..."
             [(ngModel)]="blockSearch"
           />
         </label>
       }
 
       @if (filteredAvailableBlocks().length === 0) {
-        <div class="builder-empty">
+        <div class="builder-empty" role="status">
           <p>{{ hasActiveBlocks() ? 'Nenhum bloco encontrado.' : 'Nenhum bloco disponível ainda.' }}</p>
           <button pButton type="button" class="secondary-action" (click)="showCreateBlock()">
             <i class="pi pi-plus" aria-hidden="true"></i>
@@ -314,17 +321,20 @@
           </button>
         </div>
       } @else {
-        <div class="block-option-list" aria-label="Blocos disponíveis">
+        <div class="block-option-list" aria-label="Blocos disponíveis" aria-live="polite">
           @for (block of filteredAvailableBlocks(); track block.id) {
             <article class="block-option">
               <div>
                 <h3>{{ block.name }}</h3>
                 <p>{{ block.category.name }}</p>
+                @if (block.description) {
+                  <small class="block-description-preview">{{ block.description }}</small>
+                }
                 @if (sequencePreview(block)) {
                   <small class="sequence-preview">{{ sequencePreview(block) }}</small>
                 }
               </div>
-              <button pButton type="button" class="secondary-action" (click)="addExistingBlock(block)">
+              <button pButton type="button" class="secondary-action" [attr.aria-label]="'Adicionar ' + block.name + ' ao treino'" (click)="addExistingBlock(block)">
                 <i class="pi pi-plus" aria-hidden="true"></i>
                 <span>Adicionar</span>
               </button>
@@ -358,6 +368,7 @@
           name="context-block-name"
           autocomplete="off"
           required
+          [maxlength]="maxNameLength"
           [(ngModel)]="blockCreateForm.name"
         />
       </label>
@@ -394,9 +405,11 @@
           name="context-block-description"
           rows="4"
           autocomplete="off"
+          [maxlength]="maxDescriptionLength"
           [(ngModel)]="blockCreateForm.description"
         ></textarea>
       </label>
+      <span class="notes-counter">{{ blockDescriptionCounter() }}</span>
 
       <div class="sequence-editor">
         <span>Sequência livre (opcional)</span>
@@ -407,16 +420,22 @@
             type="text"
             name="context-block-sequence-text"
             autocomplete="off"
+            [maxlength]="maxSequenceTextLength"
             [(ngModel)]="blockCreateForm.sequenceText"
             (keydown.enter)="addBlockSequenceItemFromKeyboard($event, contextSequenceInput)"
           />
-          <button pButton type="button" class="secondary-action" (click)="addBlockSequenceItem(contextSequenceInput)" [disabled]="blockCreateForm.sequenceText.trim() === '' || submitting()">
+          <button pButton type="button" class="secondary-action" (click)="addBlockSequenceItem(contextSequenceInput)" [disabled]="blockCreateForm.sequenceText.trim() === '' || blockCreateForm.sequence.length >= maxSequenceItems || submitting()">
             <i class="pi pi-plus" aria-hidden="true"></i>
             <span>Adicionar</span>
           </button>
         </div>
 
+        @if (blockSequenceError()) {
+          <p class="dialog-error" role="alert">{{ blockSequenceError() }}</p>
+        }
+
         @if (blockCreateForm.sequence.length > 0) {
+          <span class="sequence-count">{{ blockCreateForm.sequence.length }} / {{ maxSequenceItems }} itens</span>
           <ol class="sequence-list">
             @for (item of blockCreateForm.sequence; track $index) {
               <li>
@@ -473,6 +492,7 @@
         name="context-category-name"
         autocomplete="off"
         required
+        [maxlength]="maxNameLength"
         [(ngModel)]="categoryCreateForm.name"
       />
     </label>

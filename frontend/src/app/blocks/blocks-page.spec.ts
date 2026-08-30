@@ -9,7 +9,7 @@ describe('BlocksPage', () => {
   it('shows empty state', async () => {
     const { fixture } = await renderPage([], [category()]);
 
-    expect(fixture.nativeElement.textContent).toContain('Nenhum bloco cadastrado.');
+    expect(fixture.nativeElement.textContent).toContain('Você ainda não cadastrou nenhum bloco.');
   });
 
   it('shows populated block list with category', async () => {
@@ -176,7 +176,7 @@ describe('BlocksPage', () => {
     fixture.detectChanges();
 
     expect(blockApi.deleted).toEqual(['block-1']);
-    expect(fixture.nativeElement.textContent).toContain('Nenhum bloco cadastrado.');
+    expect(fixture.nativeElement.textContent).toContain('Você ainda não cadastrou nenhum bloco.');
   });
 
   it('shows safe message when block delete is blocked by workouts', async () => {

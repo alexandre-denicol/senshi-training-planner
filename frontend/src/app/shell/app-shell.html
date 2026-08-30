@@ -10,7 +10,14 @@
     <nav>
       @for (item of visibleNavItems(); track item.label) {
         @if (item.path) {
-          <a class="nav-item" [routerLink]="item.path" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+          <a
+            class="nav-item"
+            [routerLink]="item.path"
+            routerLinkActive="active"
+            #rla="routerLinkActive"
+            [routerLinkActiveOptions]="{ exact: true }"
+            [attr.aria-current]="rla.isActive ? 'page' : null"
+          >
             <i [class]="item.icon" aria-hidden="true"></i>
             <span>{{ item.label }}</span>
           </a>
@@ -32,7 +39,7 @@
       type="button"
       class="drawer-backdrop"
       aria-label="Fechar navegação"
-      (click)="drawerOpen.set(false)"
+      (click)="closeDrawer()"
     ></button>
   }
 
@@ -46,12 +53,20 @@
     <nav>
       @for (item of visibleNavItems(); track item.label) {
         @if (item.path) {
-          <a class="nav-item" [routerLink]="item.path" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" (click)="closeDrawer()">
+          <a
+            class="nav-item"
+            [routerLink]="item.path"
+            routerLinkActive="active"
+            #rla="routerLinkActive"
+            [routerLinkActiveOptions]="{ exact: true }"
+            [attr.aria-current]="rla.isActive ? 'page' : null"
+            (click)="closeDrawerAfterNavigation()"
+          >
             <i [class]="item.icon" aria-hidden="true"></i>
             <span>{{ item.label }}</span>
           </a>
         } @else {
-          <button type="button" class="nav-item" (click)="closeDrawer()">
+          <button type="button" class="nav-item" (click)="closeDrawerAfterNavigation()">
             <i [class]="item.icon" aria-hidden="true"></i>
             <span>{{ item.label }}</span>
           </button>
@@ -66,6 +81,7 @@
         pButton
         type="button"
         class="menu-button"
+        #menuButton
         aria-label="Abrir navegação"
         (click)="drawerOpen.set(true)"
       >

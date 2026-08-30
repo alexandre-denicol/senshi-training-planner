@@ -36,10 +36,10 @@
       </div>
     } @else if (!hasBlocks()) {
       <div class="empty-list">
-        <p>Nenhum bloco cadastrado.</p>
+        <p>Você ainda não cadastrou nenhum bloco.</p>
         <button pButton type="button" [disabled]="!hasActiveCategories()" (click)="openCreateDialog()">
           <i class="pi pi-plus" aria-hidden="true"></i>
-          <span>Novo bloco</span>
+          <span>Criar primeiro bloco</span>
         </button>
       </div>
     } @else {
@@ -55,7 +55,7 @@
         </thead>
         <tbody>
           @for (block of blocks(); track block.id) {
-            <tr>
+            <tr [class.inactive-row]="!block.active">
               <td>{{ block.name }}</td>
               <td>{{ block.category.name }}</td>
               <td>
@@ -106,7 +106,7 @@
 
       <div class="mobile-list">
         @for (block of blocks(); track block.id) {
-          <article class="block-card">
+          <article class="block-card" [class.inactive-row]="!block.active">
             <div>
               <h2>{{ block.name }}</h2>
               <p>{{ block.category.name }}</p>
@@ -173,6 +173,8 @@
         name="create-block-name"
         autocomplete="off"
         required
+        autofocus
+        [maxlength]="maxNameLength"
         [(ngModel)]="createForm.name"
       />
     </label>
@@ -218,6 +220,8 @@
         name="edit-block-name"
         autocomplete="off"
         required
+        autofocus
+        [maxlength]="maxNameLength"
         [(ngModel)]="editForm.name"
       />
     </label>
@@ -256,9 +260,11 @@
       [name]="prefix + '-block-description'"
       rows="5"
       autocomplete="off"
+      [maxlength]="maxDescriptionLength"
       [(ngModel)]="form.description"
     ></textarea>
   </label>
+  <span class="notes-counter">{{ descriptionCounter(form) }}</span>
 
   <section class="sequence-editor" aria-label="Sequência opcional">
     <div>
@@ -274,16 +280,22 @@
         [name]="prefix + '-block-sequence-item'"
         autocomplete="off"
         aria-label="Item da sequência"
+        [maxlength]="maxSequenceTextLength"
         [(ngModel)]="form.sequenceText"
         (keydown.enter)="addSequenceItemFromKeyboard($event, form, sequenceInput)"
       />
-      <button pButton type="button" class="secondary-action" (click)="addSequenceItem(form, sequenceInput)" [disabled]="form.sequenceText.trim() === ''">
+      <button pButton type="button" class="secondary-action" (click)="addSequenceItem(form, sequenceInput)" [disabled]="form.sequenceText.trim() === '' || form.sequence.length >= maxSequenceItems">
         <i class="pi pi-plus" aria-hidden="true"></i>
         <span>Adicionar</span>
       </button>
     </div>
 
+    @if (sequenceError()) {
+      <p class="dialog-error" role="alert">{{ sequenceError() }}</p>
+    }
+
     @if (form.sequence.length > 0) {
+      <span class="sequence-count">{{ form.sequence.length }} / {{ maxSequenceItems }} itens</span>
       <ol class="sequence-list">
         @for (item of form.sequence; track $index; let index = $index; let first = $first; let last = $last) {
           <li>
@@ -303,6 +315,8 @@
           </li>
         }
       </ol>
+    } @else {
+      <p class="sequence-empty">Nenhum item adicionado ainda.</p>
     }
   </section>
 </ng-template>

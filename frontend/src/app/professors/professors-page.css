@@ -133,6 +133,15 @@ h1 {
   color: #cbd5e1;
 }
 
+.inactive-row {
+  opacity: 0.6;
+}
+
+.inactive-row .row-actions,
+.inactive-row .card-actions {
+  opacity: 1;
+}
+
 .loading-indicator {
   animation: spin 800ms linear infinite;
   border: 3px solid #343a45;
@@ -224,6 +233,12 @@ dd {
 }
 
 .dialog-form input {
+  background: #111418;
+  border: 1px solid #343a45;
+  border-radius: 6px;
+  color: #f8fafc;
+  min-height: 2.6rem;
+  padding: 0.65rem 0.75rem;
   width: 100%;
 }
 
