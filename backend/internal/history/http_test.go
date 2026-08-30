@@ -100,27 +100,23 @@ func TestHistoryHTTPCompletionRequestBody(t *testing.T) {
 		name      string
 		body      string
 		wantCode  int
-		wantCount *int
-		wantNames []string
+		wantIDs   []string
 		wantNotes *string
 	}{
-		{name: "no body remains valid", body: "", wantCode: http.StatusCreated, wantNames: []string{}},
-		{name: "empty object valid", body: `{}`, wantCode: http.StatusCreated, wantNames: []string{}},
-		{name: "count only", body: `{"participantCount":12}`, wantCode: http.StatusCreated, wantCount: intPtr(12), wantNames: []string{}},
-		{name: "names only", body: `{"participantNames":["João","Maria"]}`, wantCode: http.StatusCreated, wantNames: []string{"João", "Maria"}},
-		{name: "count names and notes", body: `{"participantCount":1,"participantNames":["João","Maria"],"notes":"  Boa resposta.\nLinha 2  "}`, wantCode: http.StatusCreated, wantCount: intPtr(1), wantNames: []string{"João", "Maria"}, wantNotes: stringPtr("Boa resposta.\nLinha 2")},
-		{name: "zero preserved", body: `{"participantCount":0}`, wantCode: http.StatusCreated, wantCount: intPtr(0), wantNames: []string{}},
-		{name: "whitespace notes normalize to null", body: `{"notes":"   \n\t  "}`, wantCode: http.StatusCreated, wantNames: []string{}},
-		{name: "exactly max notes accepted", body: `{"notes":"` + strings.Repeat("a", MaxNotesChars) + `"}`, wantCode: http.StatusCreated, wantNames: []string{}, wantNotes: stringPtr(strings.Repeat("a", MaxNotesChars))},
+		{name: "no body remains valid", body: "", wantCode: http.StatusCreated, wantIDs: []string{}},
+		{name: "empty object valid", body: `{}`, wantCode: http.StatusCreated, wantIDs: []string{}},
+		{name: "one student", body: `{"participantStudentIds":["` + studentIDOne + `"]}`, wantCode: http.StatusCreated, wantIDs: []string{studentIDOne}},
+		{name: "students and notes", body: `{"participantStudentIds":["` + studentIDOne + `","` + studentIDTwo + `"],"notes":"  Boa resposta.\nLinha 2  "}`, wantCode: http.StatusCreated, wantIDs: []string{studentIDOne, studentIDTwo}, wantNotes: stringPtr("Boa resposta.\nLinha 2")},
+		{name: "whitespace notes normalize to null", body: `{"notes":"   \n\t  "}`, wantCode: http.StatusCreated, wantIDs: []string{}},
+		{name: "exactly max notes accepted", body: `{"notes":"` + strings.Repeat("a", MaxNotesChars) + `"}`, wantCode: http.StatusCreated, wantIDs: []string{}, wantNotes: stringPtr(strings.Repeat("a", MaxNotesChars))},
 		{name: "oversized notes rejected", body: `{"notes":"` + strings.Repeat("a", MaxNotesChars+1) + `"}`, wantCode: http.StatusBadRequest},
-		{name: "decimal count rejected", body: `{"participantCount":2.5}`, wantCode: http.StatusBadRequest},
-		{name: "negative count rejected", body: `{"participantCount":-1}`, wantCode: http.StatusBadRequest},
-		{name: "blank name rejected", body: `{"participantNames":["   "]}`, wantCode: http.StatusBadRequest},
-		{name: "unknown field rejected", body: `{"participantCount":1,"completedAt":"2026-08-23T12:00:00Z"}`, wantCode: http.StatusBadRequest},
-		{name: "malformed json rejected", body: `{"participantCount":`, wantCode: http.StatusBadRequest},
-		{name: "trailing json rejected", body: `{"participantCount":1} {"participantCount":2}`, wantCode: http.StatusBadRequest},
+		{name: "malformed student id rejected", body: `{"participantStudentIds":["not-a-uuid"]}`, wantCode: http.StatusBadRequest},
+		{name: "duplicate student id rejected", body: `{"participantStudentIds":["` + studentIDOne + `","` + studentIDOne + `"]}`, wantCode: http.StatusBadRequest},
+		{name: "unknown field rejected", body: `{"participantStudentIds":[],"completedAt":"2026-08-23T12:00:00Z"}`, wantCode: http.StatusBadRequest},
+		{name: "malformed json rejected", body: `{"participantStudentIds":`, wantCode: http.StatusBadRequest},
+		{name: "trailing json rejected", body: `{"participantStudentIds":[]} {"participantStudentIds":[]}`, wantCode: http.StatusBadRequest},
 		{name: "non object rejected", body: `[]`, wantCode: http.StatusBadRequest},
-		{name: "oversized body rejected", body: `{"participantNames":["` + strings.Repeat("a", 20*1024) + `"]}`, wantCode: http.StatusBadRequest},
+		{name: "oversized body rejected", body: `{"notes":"` + strings.Repeat("a", 20*1024) + `"}`, wantCode: http.StatusBadRequest},
 	}
 
 	for _, tt := range tests {
@@ -133,18 +129,12 @@ func TestHistoryHTTPCompletionRequestBody(t *testing.T) {
 			if tt.wantCode != http.StatusCreated {
 				return
 			}
-			if (tt.wantCount == nil) != (service.details.ParticipantCount == nil) {
-				t.Fatalf("expected count %#v, got %#v", tt.wantCount, service.details.ParticipantCount)
+			if len(service.details.ParticipantStudentIDs) != len(tt.wantIDs) {
+				t.Fatalf("expected ids %#v, got %#v", tt.wantIDs, service.details.ParticipantStudentIDs)
 			}
-			if tt.wantCount != nil && *tt.wantCount != *service.details.ParticipantCount {
-				t.Fatalf("expected count %d, got %d", *tt.wantCount, *service.details.ParticipantCount)
-			}
-			if len(service.details.ParticipantNames) != len(tt.wantNames) {
-				t.Fatalf("expected names %#v, got %#v", tt.wantNames, service.details.ParticipantNames)
-			}
-			for index, want := range tt.wantNames {
-				if service.details.ParticipantNames[index] != want {
-					t.Fatalf("expected names %#v, got %#v", tt.wantNames, service.details.ParticipantNames)
+			for index, want := range tt.wantIDs {
+				if service.details.ParticipantStudentIDs[index] != want {
+					t.Fatalf("expected ids %#v, got %#v", tt.wantIDs, service.details.ParticipantStudentIDs)
 				}
 			}
 			if (tt.wantNotes == nil) != (service.details.Notes == nil) {

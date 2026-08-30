@@ -23,8 +23,7 @@ export interface ScheduleRequest {
 }
 
 export interface CompletionDetails {
-  participantCount?: number | null;
-  participantNames?: string[];
+  participantStudentIds?: string[];
   notes?: string | null;
 }
 

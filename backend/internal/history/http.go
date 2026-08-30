@@ -15,9 +15,8 @@ type Handler struct {
 }
 
 type completeRequest struct {
-	ParticipantCount *int     `json:"participantCount"`
-	ParticipantNames []string `json:"participantNames"`
-	Notes            *string  `json:"notes"`
+	ParticipantStudentIDs []string `json:"participantStudentIds"`
+	Notes                 *string  `json:"notes"`
 }
 
 func NewHandler(service ServiceAPI) *Handler {
@@ -101,7 +100,7 @@ func writeCompletionResult(w http.ResponseWriter, detail Detail, err error) {
 		httpapi.WriteError(w, http.StatusNotFound, "schedule entry not found")
 	case errors.Is(err, ErrAlreadyCompleted):
 		httpapi.WriteError(w, http.StatusConflict, "training already completed")
-	case errors.Is(err, ErrInvalidRequest):
+	case errors.Is(err, ErrInvalidRequest), errors.Is(err, ErrInvalidParticipants):
 		httpapi.WriteError(w, http.StatusBadRequest, "invalid request")
 	case errors.Is(err, ErrSnapshotUnavailable):
 		httpapi.WriteError(w, http.StatusInternalServerError, "internal server error")
@@ -120,9 +119,8 @@ func readCompleteRequest(w http.ResponseWriter, r *http.Request) (CompletionDeta
 	}
 
 	return CompletionDetails{
-		ParticipantCount: request.ParticipantCount,
-		ParticipantNames: request.ParticipantNames,
-		Notes:            request.Notes,
+		ParticipantStudentIDs: request.ParticipantStudentIDs,
+		Notes:                 request.Notes,
 	}, nil
 }
 

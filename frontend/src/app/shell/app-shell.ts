@@ -19,6 +19,7 @@ const navItems: NavItem[] = [
   { label: 'Blocos', icon: 'pi pi-th-large', path: '/app/blocos' },
   { label: 'Categorias', icon: 'pi pi-tags', path: '/app/categorias' },
   { label: 'Histórico', icon: 'pi pi-clock', path: '/app/historico' },
+  { label: 'Alunos', icon: 'pi pi-users', path: '/app/alunos' },
   { label: 'Professores', icon: 'pi pi-users', path: '/app/professores', adminOnly: true },
 ];
 

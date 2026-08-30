@@ -80,6 +80,16 @@ func (s *PostgresStore) CompleteScheduleEntry(ctx context.Context, historyID str
 		return Detail{}, ErrSnapshotUnavailable
 	}
 
+	studentRows, err := readStudentSnapshots(ctx, tx, details.ParticipantStudentIDs)
+	if err != nil {
+		return Detail{}, err
+	}
+	participants, err := resolveParticipants(details.ParticipantStudentIDs, studentRows)
+	if err != nil {
+		return Detail{}, err
+	}
+	participantCount := len(participants)
+
 	const historyQuery = `
 		INSERT INTO training_history (
 			id, schedule_entry_id, training_date, workout_id, workout_name,
@@ -95,7 +105,7 @@ func (s *PostgresStore) CompleteScheduleEntry(ctx context.Context, historyID str
 		completedBy.ID,
 		completedBy.Name,
 		completedAt,
-		details.ParticipantCount,
+		participantCount,
 		details.Notes,
 	); historyDuplicateViolation(err) {
 		return Detail{}, ErrAlreadyCompleted
@@ -134,10 +144,10 @@ func (s *PostgresStore) CompleteScheduleEntry(ctx context.Context, historyID str
 	}
 
 	const participantQuery = `
-		INSERT INTO training_history_participants (history_id, position, name)
-		VALUES ($1, $2, $3)`
-	for index, name := range details.ParticipantNames {
-		if _, err := tx.Exec(ctx, participantQuery, historyID, index+1, name); err != nil {
+		INSERT INTO training_history_participants (history_id, position, name, student_id)
+		VALUES ($1, $2, $3, $4)`
+	for index, participant := range participants {
+		if _, err := tx.Exec(ctx, participantQuery, historyID, index+1, participant.Name, participant.StudentID); err != nil {
 			return Detail{}, err
 		}
 	}
@@ -178,6 +188,17 @@ type blockSnapshot struct {
 	Sequence     []SequenceItem
 }
 
+type studentRow struct {
+	ID     string
+	Name   string
+	Active bool
+}
+
+type participantSnapshot struct {
+	StudentID string
+	Name      string
+}
+
 type queryer interface {
 	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
@@ -206,6 +227,64 @@ func readScheduleSnapshot(ctx context.Context, tx pgx.Tx, scheduleEntryID string
 	}
 
 	return snapshot, nil
+}
+
+func readStudentSnapshots(ctx context.Context, tx pgx.Tx, studentIDs []string) ([]studentRow, error) {
+	if len(studentIDs) == 0 {
+		return nil, nil
+	}
+
+	const query = `
+		SELECT id::text, name, active
+		FROM students
+		WHERE id = ANY($1)`
+
+	rows, err := tx.Query(ctx, query, studentIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	students := make([]studentRow, 0, len(studentIDs))
+	for rows.Next() {
+		var row studentRow
+		if err := rows.Scan(&row.ID, &row.Name, &row.Active); err != nil {
+			return nil, err
+		}
+		students = append(students, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return students, nil
+}
+
+// resolveParticipants maps requested student IDs to their current name and active
+// status. It rejects nonexistent or inactive students, and returns snapshots in
+// the requested order. Each returned Name is a copy taken at call time: later
+// changes to a student's record never retroactively affect a snapshot already
+// returned here, which is what keeps completed History immutable.
+func resolveParticipants(studentIDs []string, rows []studentRow) ([]participantSnapshot, error) {
+	if len(studentIDs) == 0 {
+		return []participantSnapshot{}, nil
+	}
+
+	byID := make(map[string]studentRow, len(rows))
+	for _, row := range rows {
+		byID[row.ID] = row
+	}
+
+	snapshots := make([]participantSnapshot, 0, len(studentIDs))
+	for _, id := range studentIDs {
+		row, ok := byID[id]
+		if !ok || !row.Active {
+			return nil, ErrInvalidParticipants
+		}
+		snapshots = append(snapshots, participantSnapshot{StudentID: row.ID, Name: row.Name})
+	}
+
+	return snapshots, nil
 }
 
 func readWorkoutBlockSnapshots(ctx context.Context, tx pgx.Tx, workoutID string) ([]blockSnapshot, error) {

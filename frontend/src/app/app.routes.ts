@@ -8,6 +8,7 @@ import { LoginPage } from './login/login.page';
 import { SchedulePage } from './schedule/schedule-page';
 import { ProfessorsPage } from './professors/professors-page';
 import { AppShell } from './shell/app-shell';
+import { StudentsPage } from './students/students-page';
 import { WorkoutsPage } from './workouts/workouts-page';
 
 export const routes: Routes = [
@@ -24,6 +25,7 @@ export const routes: Routes = [
       { path: 'blocos', component: BlocksPage },
       { path: 'categorias', component: CategoriesPage },
       { path: 'historico', component: HistoryPage },
+      { path: 'alunos', component: StudentsPage },
       { path: 'professores', component: ProfessorsPage, canActivate: [adminGuard] },
     ],
   },

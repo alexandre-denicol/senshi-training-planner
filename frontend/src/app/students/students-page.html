@@ -1,0 +1,341 @@
+<section class="students-page" aria-labelledby="students-title">
+  <header class="page-header">
+    <div>
+      <h1 id="students-title">Alunos</h1>
+      <p>Gerencie a lista de alunos.</p>
+    </div>
+
+    <button
+      pButton
+      type="button"
+      class="primary-action"
+      (click)="openCreateDialog()"
+    >
+      <i class="pi pi-plus" aria-hidden="true"></i>
+      <span>Novo aluno</span>
+    </button>
+  </header>
+
+  @if (successMessage()) {
+    <p class="feedback success" role="status">{{ successMessage() }}</p>
+  }
+
+  @if (errorMessage()) {
+    <p class="feedback error" role="alert">{{ errorMessage() }}</p>
+  }
+
+  <div class="surface">
+    @if (loading()) {
+      <div class="loading-state" role="status" aria-label="Carregando alunos">
+        <span class="loading-indicator" aria-hidden="true"></span>
+      </div>
+    } @else if (!hasStudents()) {
+      <div class="empty-list">
+        <p>Você ainda não cadastrou nenhum aluno.</p>
+        <button pButton type="button" (click)="openCreateDialog()">
+          <i class="pi pi-plus" aria-hidden="true"></i>
+          <span>Criar primeiro aluno</span>
+        </button>
+      </div>
+    } @else {
+      <table class="desktop-table">
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>Status</th>
+            <th>Cadastro</th>
+            <th class="actions-heading">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (student of students(); track student.id) {
+            <tr [class.inactive-row]="!student.active">
+              <td>{{ student.name }}</td>
+              <td>
+                <span class="status-badge" [class.inactive]="!student.active">{{ statusLabel(student) }}</span>
+              </td>
+              <td>{{ formatDate(student.createdAt) }}</td>
+              <td>
+                <div class="row-actions">
+                  <button
+                    pButton
+                    type="button"
+                    class="icon-action"
+                    aria-label="Editar aluno"
+                    title="Editar"
+                    [disabled]="rowActionId() === student.id"
+                    (click)="openEditDialog(student)"
+                  >
+                    <i class="pi pi-pencil" aria-hidden="true"></i>
+                  </button>
+                  <button
+                    pButton
+                    type="button"
+                    class="icon-action"
+                    [attr.aria-label]="student.active ? 'Desativar aluno' : 'Ativar aluno'"
+                    [title]="student.active ? 'Desativar' : 'Ativar'"
+                    [disabled]="rowActionId() === student.id"
+                    (click)="confirmStatus(student)"
+                  >
+                    <i [class]="student.active ? 'pi pi-ban' : 'pi pi-check-circle'" aria-hidden="true"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+
+      <div class="mobile-list">
+        @for (student of students(); track student.id) {
+          <article class="student-card" [class.inactive-row]="!student.active">
+            <div>
+              <h2>{{ student.name }}</h2>
+              @if (student.phone) {
+                <p class="secondary">{{ student.phone }}</p>
+              }
+            </div>
+            <span class="status-badge" [class.inactive]="!student.active">{{ statusLabel(student) }}</span>
+            <dl>
+              <dt>Cadastro</dt>
+              <dd>{{ formatDate(student.createdAt) }}</dd>
+            </dl>
+            <div class="card-actions">
+              <button
+                pButton
+                type="button"
+                class="icon-action"
+                aria-label="Editar aluno"
+                title="Editar"
+                (click)="openEditDialog(student)"
+              >
+                <i class="pi pi-pencil" aria-hidden="true"></i>
+              </button>
+              <button
+                pButton
+                type="button"
+                class="icon-action"
+                [attr.aria-label]="student.active ? 'Desativar aluno' : 'Ativar aluno'"
+                [title]="student.active ? 'Desativar' : 'Ativar'"
+                (click)="confirmStatus(student)"
+              >
+                <i [class]="student.active ? 'pi pi-ban' : 'pi pi-check-circle'" aria-hidden="true"></i>
+              </button>
+            </div>
+          </article>
+        }
+      </div>
+    }
+  </div>
+</section>
+
+<p-dialog
+  header="Novo aluno"
+  [(visible)]="createDialogOpen"
+  [modal]="true"
+  [draggable]="false"
+  [resizable]="false"
+  styleClass="student-dialog"
+  (onHide)="closeCreateDialog()"
+>
+  <form class="dialog-form" (ngSubmit)="createStudent()">
+    <label>
+      <span>Nome</span>
+      <input
+        pInputText
+        type="text"
+        name="create-name"
+        autocomplete="off"
+        required
+        autofocus
+        [maxlength]="maxNameLength"
+        [(ngModel)]="createForm.name"
+      />
+    </label>
+
+    <label>
+      <span>Data de nascimento</span>
+      <input
+        pInputText
+        type="date"
+        name="create-birth-date"
+        autocomplete="off"
+        [(ngModel)]="createForm.birthDate"
+      />
+    </label>
+
+    <label>
+      <span>Telefone</span>
+      <input
+        pInputText
+        type="tel"
+        name="create-phone"
+        autocomplete="off"
+        [maxlength]="maxPhoneLength"
+        [(ngModel)]="createForm.phone"
+      />
+    </label>
+
+    <label>
+      <span>Responsável</span>
+      <input
+        pInputText
+        type="text"
+        name="create-guardian-name"
+        autocomplete="off"
+        [maxlength]="maxNameLength"
+        [(ngModel)]="createForm.guardianName"
+      />
+    </label>
+
+    <label>
+      <span>Telefone do responsável</span>
+      <input
+        pInputText
+        type="tel"
+        name="create-guardian-phone"
+        autocomplete="off"
+        [maxlength]="maxPhoneLength"
+        [(ngModel)]="createForm.guardianPhone"
+      />
+    </label>
+
+    <label>
+      <span>Observações</span>
+      <textarea
+        pInputTextarea
+        name="create-notes"
+        rows="3"
+        autocomplete="off"
+        [maxlength]="maxNotesLength"
+        [(ngModel)]="createForm.notes"
+      ></textarea>
+    </label>
+
+    <footer class="dialog-actions">
+      <button pButton type="button" class="secondary-action" (click)="closeCreateDialog()" [disabled]="submitting()">
+        Cancelar
+      </button>
+      <button pButton type="submit" [disabled]="!formValid(createForm) || submitting()">
+        {{ submitting() ? 'Salvando...' : 'Salvar' }}
+      </button>
+    </footer>
+  </form>
+</p-dialog>
+
+<p-dialog
+  header="Editar aluno"
+  [(visible)]="editDialogOpen"
+  [modal]="true"
+  [draggable]="false"
+  [resizable]="false"
+  styleClass="student-dialog"
+  (onHide)="closeEditDialog()"
+>
+  <form class="dialog-form" (ngSubmit)="updateStudent()">
+    <label>
+      <span>Nome</span>
+      <input
+        pInputText
+        type="text"
+        name="edit-name"
+        autocomplete="off"
+        required
+        autofocus
+        [maxlength]="maxNameLength"
+        [(ngModel)]="editForm.name"
+      />
+    </label>
+
+    <label>
+      <span>Data de nascimento</span>
+      <input
+        pInputText
+        type="date"
+        name="edit-birth-date"
+        autocomplete="off"
+        [(ngModel)]="editForm.birthDate"
+      />
+    </label>
+
+    <label>
+      <span>Telefone</span>
+      <input
+        pInputText
+        type="tel"
+        name="edit-phone"
+        autocomplete="off"
+        [maxlength]="maxPhoneLength"
+        [(ngModel)]="editForm.phone"
+      />
+    </label>
+
+    <label>
+      <span>Responsável</span>
+      <input
+        pInputText
+        type="text"
+        name="edit-guardian-name"
+        autocomplete="off"
+        [maxlength]="maxNameLength"
+        [(ngModel)]="editForm.guardianName"
+      />
+    </label>
+
+    <label>
+      <span>Telefone do responsável</span>
+      <input
+        pInputText
+        type="tel"
+        name="edit-guardian-phone"
+        autocomplete="off"
+        [maxlength]="maxPhoneLength"
+        [(ngModel)]="editForm.guardianPhone"
+      />
+    </label>
+
+    <label>
+      <span>Observações</span>
+      <textarea
+        pInputTextarea
+        name="edit-notes"
+        rows="3"
+        autocomplete="off"
+        [maxlength]="maxNotesLength"
+        [(ngModel)]="editForm.notes"
+      ></textarea>
+    </label>
+
+    <footer class="dialog-actions">
+      <button pButton type="button" class="secondary-action" (click)="closeEditDialog()" [disabled]="submitting()">
+        Cancelar
+      </button>
+      <button pButton type="submit" [disabled]="!formValid(editForm) || submitting()">
+        {{ submitting() ? 'Salvando...' : 'Salvar' }}
+      </button>
+    </footer>
+  </form>
+</p-dialog>
+
+<p-dialog
+  [header]="confirmationTitle()"
+  [visible]="confirmation() !== null"
+  [modal]="true"
+  [draggable]="false"
+  [resizable]="false"
+  styleClass="student-dialog"
+  (onHide)="cancelConfirmation()"
+>
+  <div class="confirmation-body">
+    <p>{{ confirmationText() }}</p>
+  </div>
+
+  <footer class="dialog-actions">
+    <button pButton type="button" class="secondary-action" (click)="cancelConfirmation()" [disabled]="submitting()">
+      Cancelar
+    </button>
+    <button pButton type="button" (click)="applyConfirmation()" [disabled]="submitting()">
+      {{ submitting() ? 'Processando...' : 'Confirmar' }}
+    </button>
+  </footer>
+</p-dialog>

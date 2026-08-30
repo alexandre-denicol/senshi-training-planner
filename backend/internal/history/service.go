@@ -127,36 +127,41 @@ func validID(id string) bool {
 }
 
 func validateCompletionDetails(details CompletionDetails) (CompletionDetails, error) {
-	if details.ParticipantCount != nil {
-		if *details.ParticipantCount < 0 || *details.ParticipantCount > MaxParticipantCount {
-			return CompletionDetails{}, ErrInvalidRequest
-		}
-	}
-	if len(details.ParticipantNames) > MaxParticipantNames {
-		return CompletionDetails{}, ErrInvalidRequest
+	studentIDs, err := validateParticipantStudentIDs(details.ParticipantStudentIDs)
+	if err != nil {
+		return CompletionDetails{}, err
 	}
 	notes := normalizeNotes(details.Notes)
 	if notes != nil && len([]rune(*notes)) > MaxNotesChars {
 		return CompletionDetails{}, ErrInvalidRequest
 	}
 
-	names := make([]string, 0, len(details.ParticipantNames))
-	for _, name := range details.ParticipantNames {
-		trimmed := strings.TrimSpace(name)
-		if trimmed == "" {
-			return CompletionDetails{}, ErrInvalidRequest
-		}
-		if len([]rune(trimmed)) > MaxParticipantNameChars {
-			return CompletionDetails{}, ErrInvalidRequest
-		}
-		names = append(names, trimmed)
+	return CompletionDetails{
+		ParticipantStudentIDs: studentIDs,
+		Notes:                 notes,
+	}, nil
+}
+
+func validateParticipantStudentIDs(ids []string) ([]string, error) {
+	if len(ids) > MaxParticipantStudentIDs {
+		return nil, ErrInvalidParticipants
 	}
 
-	return CompletionDetails{
-		ParticipantCount: details.ParticipantCount,
-		ParticipantNames: names,
-		Notes:            notes,
-	}, nil
+	seen := make(map[string]struct{}, len(ids))
+	clean := make([]string, 0, len(ids))
+	for _, id := range ids {
+		trimmed := strings.TrimSpace(id)
+		if !validID(trimmed) {
+			return nil, ErrInvalidParticipants
+		}
+		if _, ok := seen[trimmed]; ok {
+			return nil, ErrInvalidParticipants
+		}
+		seen[trimmed] = struct{}{}
+		clean = append(clean, trimmed)
+	}
+
+	return clean, nil
 }
 
 func normalizeNotes(notes *string) *string {
