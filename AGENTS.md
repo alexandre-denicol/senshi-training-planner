@@ -1,41 +1,52 @@
-# Senshi Passo de Torres
+# Senshi Training Planner
 
-## Arquitetura
+## Architecture
 
-Este repositorio e um monorepo com dois projetos principais:
+This repository is a monorepo with two main applications:
 
-- `backend/`: API HTTP em Go.
-- `frontend/`: aplicacao web em Angular.
+- `backend/`: Go HTTP API.
+- `frontend/`: Angular web application.
 
-## Stack planejada
+## Current stack
 
 - Backend: Go.
-- Frontend: Angular.
-- UI: PrimeNG e PrimeIcons.
-- Banco de dados futuro: PostgreSQL hospedado no Supabase.
-- Deploy futuro do backend: Render.
-- Deploy futuro do frontend: Vercel.
+- Frontend: Angular 21.
+- UI: PrimeNG and PrimeIcons.
+- Database: PostgreSQL hosted on Supabase.
+- Backend deployment: Render.
+- Frontend deployment: Vercel.
 
-## Regras de desenvolvimento
+## Domain
 
-- Nao inventar funcionalidades alem da especificacao solicitada.
-- Manter cada passo pequeno e revisavel.
-- Nao adicionar banco de dados, autenticacao ou entidades de dominio antes de haver uma especificacao explicita.
-- Preferir solucoes idiomaticas e simples antes de criar abstracoes.
-- A interface da aplicacao deve usar pt-BR.
-- O visual padrao deve ser dark mode e responsivo para desktop e mobile.
-- PostgreSQL deve ser acessado somente pelo backend Go.
-- O frontend nunca deve acessar Supabase ou PostgreSQL diretamente.
-- Implementacoes sensiveis de seguranca devem seguir as referencias OWASP do projeto.
-- Nunca commitar credenciais reais, secrets, senhas ou hashes.
-- Nunca logar `DATABASE_URL`, senhas, hashes ou secrets.
-- Autenticacao e gerenciada pelo backend com sessoes opacas no servidor.
-- Nao introduzir JWT a menos que a arquitetura seja explicitamente alterada.
-- Segredos de autenticacao nunca devem usar `localStorage` ou `sessionStorage` no navegador.
-- Cookies de sessao devem ser `HttpOnly`.
-- Invalidacao de sessao no servidor e obrigatoria.
-- Senhas devem usar Argon2id.
-- Falhas de autenticacao nao devem revelar se uma conta existe.
-- Gerenciamento de contas de professores e exclusivo para ADMIN.
-- Endpoints de gerenciamento de professores nunca devem alterar contas ADMIN.
-- Desativacao e redefinicao de senha de professores devem invalidar sessoes existentes do professor.
+Core flow:
+
+```text
+Category -> Block -> Workout -> Schedule -> History
+```
+
+The application also manages students and professor accounts.
+
+History represents an immutable snapshot of completed training and must not depend on later catalog changes.
+
+## Development rules
+
+- Keep changes small, coherent, and reviewable.
+- Prefer existing patterns before introducing new abstractions.
+- Do not add dependencies unless needed.
+- Keep the UI in pt-BR.
+- Preserve the responsive dark-mode visual identity.
+- PostgreSQL must be accessed only by the Go backend.
+- The frontend must never access Supabase or PostgreSQL directly.
+- Never commit real credentials, secrets, passwords, session tokens, or password hashes.
+- Never log `DATABASE_URL`, credentials, session tokens, password hashes, or secrets.
+- Authentication uses opaque server-side sessions.
+- Do not introduce JWT unless the architecture is intentionally changed.
+- Authentication secrets must not be stored in browser `localStorage` or `sessionStorage`.
+- Session cookies must remain `HttpOnly`.
+- Server-side session invalidation is mandatory.
+- Passwords must use Argon2id.
+- Authentication failures must not disclose whether an account exists.
+- Professor account administration is ADMIN-only.
+- Professor-management endpoints must never modify ADMIN accounts.
+- Disabling a professor or resetting a professor password must invalidate that professor's active sessions.
+- Mutable E2E tests must use an isolated test database.
