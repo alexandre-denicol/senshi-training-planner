@@ -134,7 +134,7 @@ The repository intentionally contains only example environment files. Real crede
 
 ### Requirements
 
-- Go 1.21+
+- Go 1.25.11+
 - Node.js compatible with Angular 21
 - npm
 - PostgreSQL
