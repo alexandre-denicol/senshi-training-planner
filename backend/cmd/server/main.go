@@ -5,7 +5,10 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/alexandre/senshi-training-planner/backend/internal/auth"
@@ -96,9 +99,29 @@ func main() {
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
-	log.Printf("server listening on :%s", cfg.Port)
-	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatal(err)
+	serverErrors := make(chan error, 1)
+	go func() {
+		log.Printf("server listening on :%s", cfg.Port)
+		serverErrors <- server.ListenAndServe()
+	}()
+
+	shutdownSignal := make(chan os.Signal, 1)
+	signal.Notify(shutdownSignal, syscall.SIGINT, syscall.SIGTERM)
+
+	select {
+	case err := <-serverErrors:
+		if err != nil && err != http.ErrServerClosed {
+			log.Fatal(err)
+		}
+	case sig := <-shutdownSignal:
+		log.Printf("received %s, shutting down", sig)
+
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer shutdownCancel()
+
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			log.Fatal(err)
+		}
 	}
 }
 
