@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexandre/senshi-training-planner/backend/internal/config"
+	"github.com/alexandre-denicol/senshi-training-planner/backend/internal/config"
 )
 
 func TestReadJSONValidation(t *testing.T) {

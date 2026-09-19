@@ -11,16 +11,16 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/alexandre/senshi-training-planner/backend/internal/auth"
-	"github.com/alexandre/senshi-training-planner/backend/internal/blocks"
-	"github.com/alexandre/senshi-training-planner/backend/internal/categories"
-	"github.com/alexandre/senshi-training-planner/backend/internal/config"
-	"github.com/alexandre/senshi-training-planner/backend/internal/database"
-	"github.com/alexandre/senshi-training-planner/backend/internal/history"
-	"github.com/alexandre/senshi-training-planner/backend/internal/professors"
-	"github.com/alexandre/senshi-training-planner/backend/internal/schedule"
-	"github.com/alexandre/senshi-training-planner/backend/internal/students"
-	"github.com/alexandre/senshi-training-planner/backend/internal/workouts"
+	"github.com/alexandre-denicol/senshi-training-planner/backend/internal/auth"
+	"github.com/alexandre-denicol/senshi-training-planner/backend/internal/blocks"
+	"github.com/alexandre-denicol/senshi-training-planner/backend/internal/categories"
+	"github.com/alexandre-denicol/senshi-training-planner/backend/internal/config"
+	"github.com/alexandre-denicol/senshi-training-planner/backend/internal/database"
+	"github.com/alexandre-denicol/senshi-training-planner/backend/internal/history"
+	"github.com/alexandre-denicol/senshi-training-planner/backend/internal/professors"
+	"github.com/alexandre-denicol/senshi-training-planner/backend/internal/schedule"
+	"github.com/alexandre-denicol/senshi-training-planner/backend/internal/students"
+	"github.com/alexandre-denicol/senshi-training-planner/backend/internal/workouts"
 )
 
 func main() {

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexandre/senshi-training-planner/backend/internal/auth"
+	"github.com/alexandre-denicol/senshi-training-planner/backend/internal/auth"
 )
 
 const (

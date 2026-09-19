@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/alexandre/senshi-training-planner/backend/internal/database"
+	"github.com/alexandre-denicol/senshi-training-planner/backend/internal/database"
 )
 
 func TestRunRequiresCommand(t *testing.T) {

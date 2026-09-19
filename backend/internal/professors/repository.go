@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/alexandre/senshi-training-planner/backend/internal/auth"
+	"github.com/alexandre-denicol/senshi-training-planner/backend/internal/auth"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
