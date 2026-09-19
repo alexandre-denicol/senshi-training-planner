@@ -12,9 +12,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/alexandre/senshi-training-planner/backend/internal/auth"
-	"github.com/alexandre/senshi-training-planner/backend/internal/config"
-	"github.com/alexandre/senshi-training-planner/backend/internal/database"
+	"github.com/alexandre-denicol/senshi-training-planner/backend/internal/auth"
+	"github.com/alexandre-denicol/senshi-training-planner/backend/internal/config"
+	"github.com/alexandre-denicol/senshi-training-planner/backend/internal/database"
 	"golang.org/x/term"
 )
 

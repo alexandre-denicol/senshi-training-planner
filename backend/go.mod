@@ -1,4 +1,4 @@
-module github.com/alexandre/senshi-training-planner/backend
+module github.com/alexandre-denicol/senshi-training-planner/backend
 
 go 1.25.11
 
