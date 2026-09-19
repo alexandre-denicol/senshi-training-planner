@@ -36,6 +36,14 @@ The system supports the full training lifecycle:
 | History | Immutable records of completed training sessions |
 | Security | Authentication, roles and server-side session control |
 
+## Product preview
+
+<p align="center">
+  <img src="docs/screenshots/dashboard.webp" alt="Senshi Training Planner admin dashboard" width="900">
+</p>
+
+<p align="center"><em>Admin dashboard</em></p>
+
 ## Architecture
 
 ```mermaid
