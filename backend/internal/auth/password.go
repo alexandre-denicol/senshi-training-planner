@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	MinPasswordRunes = 15
+	MinPasswordRunes = 8
 	MaxPasswordBytes = 4096
 
 	argonMemory      = 64 * 1024
@@ -25,7 +25,7 @@ const (
 )
 
 var (
-	ErrPasswordTooShort = errors.New("password must be at least 15 characters")
+	ErrPasswordTooShort = errors.New("password must be at least 8 characters")
 	ErrPasswordTooLong  = errors.New("password is too long")
 	ErrPasswordInvalid  = errors.New("password is invalid")
 )

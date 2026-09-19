@@ -16,6 +16,33 @@ type LoginResult struct {
 	SessionToken string
 }
 
+type passwordChangeStore interface {
+	ChangePassword(context.Context, string, string) error
+}
+
+func (s *Service) ChangePassword(ctx context.Context, user PublicUser, currentPassword string, newPassword string) error {
+	account, err := s.store.FindUserByEmail(ctx, user.Email)
+	if err != nil || !account.Active {
+		return ErrInvalidCredentials
+	}
+	ok, err := VerifyPassword(currentPassword, account.PasswordHash)
+	if err != nil || !ok {
+		return ErrInvalidCredentials
+	}
+	if err := ValidatePassword(newPassword); err != nil {
+		return err
+	}
+	passwordHash, err := HashPassword(newPassword)
+	if err != nil {
+		return err
+	}
+	store, ok := s.store.(passwordChangeStore)
+	if !ok {
+		return errors.New("password change unavailable")
+	}
+	return store.ChangePassword(ctx, account.ID, passwordHash)
+}
+
 func NewService(store Store) *Service {
 	return &Service{
 		store: store,

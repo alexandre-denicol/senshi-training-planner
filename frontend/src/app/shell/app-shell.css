@@ -222,6 +222,13 @@ nav {
   padding-inline: 0;
   width: 2.55rem;
 }
+.password-button { background: rgba(7, 19, 42, 0.85); border-color: rgba(59, 130, 246, 0.45); border-radius: 999px; color: #dbeafe; min-height: 2.55rem; width: 2.55rem; }
+.password-dialog-backdrop { align-items: center; background: rgba(0, 0, 0, .68); display: flex; inset: 0; justify-content: center; padding: 1rem; position: fixed; z-index: 50; }
+.password-dialog { background: #07132a; border: 1px solid rgba(148, 163, 184, .3); border-radius: 12px; max-width: 30rem; padding: 1.5rem; width: 100%; }
+.password-dialog form { display: grid; gap: .55rem; }
+.password-dialog input { background: #020814; border: 1px solid #52627a; border-radius: 6px; color: #fff; min-height: 2.7rem; padding: .55rem; }
+.password-dialog-actions { display: flex; gap: .75rem; justify-content: flex-end; margin-top: .75rem; }
+.form-error { color: #fca5a5; font-size: .85rem; margin: 0; }
 
 .content {
   min-width: 0;

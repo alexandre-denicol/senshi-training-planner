@@ -20,6 +20,13 @@ export class LoginPage {
   protected password = '';
   protected loading = signal(false);
   protected errorMessage = signal('');
+  protected readonly infoMessage = signal('');
+
+  constructor() {
+    const navigation = this.router.getCurrentNavigation();
+    const message = navigation?.extras.state?.['message'];
+    if (typeof message === 'string') this.infoMessage.set(message);
+  }
 
   protected async submit(): Promise<void> {
     if (this.loading()) {

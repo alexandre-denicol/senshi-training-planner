@@ -71,6 +71,11 @@ export class AuthService {
     }
   }
 
+  async changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    await firstValueFrom(this.http.put<void>('/api/auth/password', { currentPassword, newPassword }, { withCredentials: true }));
+    this.setUnauthenticated();
+  }
+
   private setAuthenticated(user: AuthUser): void {
     this.userSignal.set(user);
     this.statusSignal.set('authenticated');

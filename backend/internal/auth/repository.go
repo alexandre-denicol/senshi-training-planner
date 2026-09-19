@@ -125,6 +125,28 @@ func (s *PostgresStore) DeleteSessionByTokenHash(ctx context.Context, tokenHash 
 	return err
 }
 
+func (s *PostgresStore) ChangePassword(ctx context.Context, userID string, passwordHash string) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	const updateQuery = `UPDATE users SET password_hash = $2 WHERE id = $1 AND active = true`
+	commandTag, err := tx.Exec(ctx, updateQuery, userID, passwordHash)
+	if err != nil {
+		return err
+	}
+	if commandTag.RowsAffected() == 0 {
+		return ErrUnauthenticated
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM sessions WHERE user_id = $1`, userID); err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
+}
+
 func (s *PostgresStore) EmailExists(ctx context.Context, email string) (bool, error) {
 	const query = `SELECT EXISTS (SELECT 1 FROM users WHERE lower(email) = $1)`
 

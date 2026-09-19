@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, ElementRef, HostListener, ViewChild, computed, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
 import { AuthService } from '../auth/auth.service';
@@ -24,7 +25,7 @@ const navItems: NavItem[] = [
 ];
 
 @Component({
-  imports: [ButtonModule, CommonModule, RouterLink, RouterLinkActive, RouterOutlet],
+  imports: [ButtonModule, CommonModule, FormsModule, RouterLink, RouterLinkActive, RouterOutlet],
   selector: 'app-shell',
   styleUrl: './app-shell.css',
   templateUrl: './app-shell.html',
@@ -36,6 +37,10 @@ export class AppShell {
   @ViewChild('menuButton') private readonly menuButton?: ElementRef<HTMLButtonElement>;
 
   protected readonly drawerOpen = signal(false);
+  protected readonly passwordDialogOpen = signal(false);
+  protected readonly passwordLoading = signal(false);
+  protected readonly passwordError = signal('');
+  protected passwordForm = { currentPassword: '', newPassword: '', confirmPassword: '' };
   protected readonly user = computed(() => this.auth.currentUser() as AuthUser);
   protected readonly visibleNavItems = computed(() => {
     const user = this.auth.currentUser();
@@ -65,4 +70,21 @@ export class AppShell {
     await this.auth.logout();
     await this.router.navigateByUrl('/login');
   }
+
+  protected openPasswordDialog(): void { this.passwordError.set(''); this.passwordDialogOpen.set(true); }
+  protected closePasswordDialog(): void { this.passwordDialogOpen.set(false); this.clearPasswordForm(); }
+  protected passwordFormValid(): boolean {
+    return this.passwordForm.currentPassword.length > 0 && this.passwordForm.newPassword.length >= 8 && this.passwordForm.newPassword === this.passwordForm.confirmPassword;
+  }
+  protected async changePassword(): Promise<void> {
+    if (this.passwordLoading() || !this.passwordFormValid()) return;
+    this.passwordLoading.set(true); this.passwordError.set('');
+    try {
+      await this.auth.changePassword(this.passwordForm.currentPassword, this.passwordForm.newPassword);
+      this.clearPasswordForm(); this.passwordDialogOpen.set(false);
+      await this.router.navigateByUrl('/login', { state: { message: 'Senha alterada. Entre novamente com a nova senha.' } });
+    } catch { this.passwordError.set('Não foi possível alterar a senha. Verifique a senha atual e tente novamente.'); }
+    finally { this.passwordLoading.set(false); }
+  }
+  private clearPasswordForm(): void { this.passwordForm = { currentPassword: '', newPassword: '', confirmPassword: '' }; }
 }
