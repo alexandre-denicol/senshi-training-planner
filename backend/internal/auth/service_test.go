@@ -23,13 +23,31 @@ type fakeStore struct {
 	createdAdmin        User
 	changedPasswordUser string
 	changedPasswordHash string
+	usersByID           map[string]User
+	lookedUpEmail       string
+	lookedUpUserID      string
 }
 
-func (s *fakeStore) FindUserByEmail(context.Context, string) (User, error) {
+func (s *fakeStore) FindUserByEmail(_ context.Context, email string) (User, error) {
+	s.lookedUpEmail = email
 	if s.findUserErr != nil {
 		return User{}, s.findUserErr
 	}
+	if s.user.Email == "" || email != s.user.Email {
+		return User{}, ErrInvalidCredentials
+	}
 	return s.user, nil
+}
+
+func (s *fakeStore) FindUserByID(_ context.Context, userID string) (User, error) {
+	s.lookedUpUserID = userID
+	if user, ok := s.usersByID[userID]; ok {
+		return user, nil
+	}
+	if s.user.ID == userID {
+		return s.user, nil
+	}
+	return User{}, ErrUnauthenticated
 }
 
 func (s *fakeStore) CreateSession(_ context.Context, session Session) error {
@@ -82,14 +100,22 @@ func TestChangePasswordForBothRolesInvalidatesThroughStore(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			store := &fakeStore{user: User{ID: "user-id", Email: "user@example.com", PasswordHash: oldHash, Role: role, Active: true}}
+			store := &fakeStore{usersByID: map[string]User{
+				"user-id": {ID: "user-id", Email: "User@Example.com", PasswordHash: oldHash, Role: role, Active: true},
+			}}
 			service := NewService(store)
-			err = service.ChangePassword(context.Background(), PublicUser{ID: "user-id", Email: "user@example.com", Role: role}, "senha antiga segura", "nova1234")
+			err = service.ChangePassword(context.Background(), PublicUser{ID: "user-id", Email: "USER@example.com", Role: role}, "senha antiga segura", "nova1234")
 			if err != nil {
 				t.Fatalf("expected password change, got %v", err)
 			}
 			if store.changedPasswordUser != "user-id" || store.changedPasswordHash == "" {
 				t.Fatal("expected authenticated user hash update")
+			}
+			if store.lookedUpUserID != "user-id" {
+				t.Fatalf("expected lookup by authenticated user ID, got %q", store.lookedUpUserID)
+			}
+			if store.lookedUpEmail != "" {
+				t.Fatalf("expected password change not to resolve by email, got %q", store.lookedUpEmail)
 			}
 			if ok, verifyErr := VerifyPassword("nova1234", store.changedPasswordHash); verifyErr != nil || !ok {
 				t.Fatal("expected new password to verify")
@@ -106,14 +132,19 @@ func TestChangePasswordRejectsWrongCurrentAndShortNewPassword(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store := &fakeStore{user: User{ID: "user-id", Email: "user@example.com", PasswordHash: oldHash, Active: true}}
+	store := &fakeStore{usersByID: map[string]User{
+		"user-id": {ID: "user-id", Email: "User@Example.com", PasswordHash: oldHash, Active: true},
+	}}
 	service := NewService(store)
-	user := PublicUser{ID: "user-id", Email: "user@example.com"}
+	user := PublicUser{ID: "user-id", Email: "USER@example.com"}
 	if err := service.ChangePassword(context.Background(), user, "senha incorreta", "nova1234"); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected generic credential error, got %v", err)
 	}
 	if err := service.ChangePassword(context.Background(), user, "senha antiga segura", "curta"); !errors.Is(err, ErrPasswordTooShort) {
 		t.Fatalf("expected short-password error, got %v", err)
+	}
+	if store.changedPasswordUser != "" {
+		t.Fatal("expected rejected password changes not to update any account")
 	}
 }
 

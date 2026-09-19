@@ -17,16 +17,22 @@ type LoginResult struct {
 }
 
 type passwordChangeStore interface {
+	FindUserByID(context.Context, string) (User, error)
 	ChangePassword(context.Context, string, string) error
 }
 
 func (s *Service) ChangePassword(ctx context.Context, user PublicUser, currentPassword string, newPassword string) error {
-	account, err := s.store.FindUserByEmail(ctx, user.Email)
+	store, ok := s.store.(passwordChangeStore)
+	if !ok {
+		return errors.New("password change unavailable")
+	}
+
+	account, err := store.FindUserByID(ctx, user.ID)
 	if err != nil || !account.Active {
 		return ErrInvalidCredentials
 	}
-	ok, err := VerifyPassword(currentPassword, account.PasswordHash)
-	if err != nil || !ok {
+	verified, err := VerifyPassword(currentPassword, account.PasswordHash)
+	if err != nil || !verified {
 		return ErrInvalidCredentials
 	}
 	if err := ValidatePassword(newPassword); err != nil {
@@ -35,10 +41,6 @@ func (s *Service) ChangePassword(ctx context.Context, user PublicUser, currentPa
 	passwordHash, err := HashPassword(newPassword)
 	if err != nil {
 		return err
-	}
-	store, ok := s.store.(passwordChangeStore)
-	if !ok {
-		return errors.New("password change unavailable")
 	}
 	return store.ChangePassword(ctx, account.ID, passwordHash)
 }
