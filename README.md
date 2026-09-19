@@ -1,8 +1,26 @@
 # Senshi Training Planner
 
-Full-stack training management platform built for Senshi Kickboxing, covering workout planning, scheduling, student management, execution tracking, and training history.
+<p align="center">
+  <img src="frontend/public/branding/senshi-branding.jpeg" alt="Senshi Training Planner" width="720">
+</p>
 
-**Live application:** https://senshi-training-planner.vercel.app
+<p align="center">
+  <strong>Full-stack training management platform for Senshi Kickboxing.</strong><br>
+  Workout planning, scheduling, student management, execution tracking and training history.
+</p>
+
+<p align="center">
+  <a href="https://senshi-training-planner.vercel.app"><strong>Open live application</strong></a>
+</p>
+
+<p align="center">
+  <img alt="CI" src="https://github.com/alexandre-denicol/senshi-training-planner/actions/workflows/ci.yml/badge.svg">
+  <img alt="CodeQL" src="https://github.com/alexandre-denicol/senshi-training-planner/actions/workflows/codeql.yml/badge.svg">
+  <img alt="Go" src="https://img.shields.io/badge/Go-1.25.11+-00ADD8?logo=go&logoColor=white">
+  <img alt="Angular" src="https://img.shields.io/badge/Angular-21-DD0031?logo=angular&logoColor=white">
+  <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-Supabase-4169E1?logo=postgresql&logoColor=white">
+  <img alt="License" src="https://img.shields.io/badge/license-All%20rights%20reserved-lightgrey">
+</p>
 
 ## Overview
 
@@ -10,37 +28,47 @@ Senshi Training Planner is a production-deployed web application designed to org
 
 The system supports the full training lifecycle:
 
-- training categories and reusable blocks;
-- workout creation and composition;
-- schedule management;
-- student management;
-- professor account administration;
-- completion of scheduled sessions;
-- immutable training history;
-- authentication and role-based authorization.
+| Area | Capabilities |
+| --- | --- |
+| Training design | Categories, reusable blocks and workout composition |
+| Scheduling | Training agenda and completion workflow |
+| People | Student management and professor administration |
+| History | Immutable records of completed training sessions |
+| Security | Authentication, roles and server-side session control |
 
 ## Architecture
 
-```text
-Angular 21 + PrimeNG
-        |
-        | HTTPS / REST
-        v
-Go HTTP API
-        |
-        v
-PostgreSQL / Supabase
+```mermaid
+flowchart LR
+    U[User] -->|HTTPS| F[Angular 21 + PrimeNG]
+    F -->|REST API| B[Go HTTP API]
+    B -->|pgx| D[(PostgreSQL)]
+    F --> V[Vercel]
+    B --> R[Render]
+    D --> S[Supabase]
 ```
 
-Production deployment:
+### Production
 
-- **Frontend:** Vercel
-- **Backend:** Render
-- **Database:** PostgreSQL hosted on Supabase
+| Layer | Platform |
+| --- | --- |
+| Frontend | Vercel |
+| Backend | Render |
+| Database | PostgreSQL on Supabase |
 
 The frontend never connects directly to PostgreSQL or Supabase. Database access is restricted to the Go backend.
 
 ## Tech stack
+
+<p>
+  <img alt="Go" src="https://img.shields.io/badge/Go-00ADD8?logo=go&logoColor=white">
+  <img alt="Angular" src="https://img.shields.io/badge/Angular-DD0031?logo=angular&logoColor=white">
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white">
+  <img alt="PrimeNG" src="https://img.shields.io/badge/PrimeNG-2196F3">
+  <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white">
+  <img alt="Playwright" src="https://img.shields.io/badge/Playwright-2EAD33?logo=playwright&logoColor=white">
+  <img alt="GitHub Actions" src="https://img.shields.io/badge/GitHub_Actions-2088FF?logo=githubactions&logoColor=white">
+</p>
 
 ### Backend
 
@@ -232,7 +260,7 @@ go run ./cmd/migrate down
 
 Production database accounts should follow least-privilege principles.
 
-## CI
+## CI and security automation
 
 GitHub Actions validates:
 
@@ -242,21 +270,13 @@ GitHub Actions validates:
 - Angular tests;
 - production frontend build.
 
-Dependency updates are tracked with Dependabot.
+CodeQL analyzes Go and JavaScript/TypeScript. Dependency updates are tracked with Dependabot.
 
 ## Project status
 
-The application is deployed and functional.
+**Production:** deployed and functional.
 
-This repository is also maintained as a public engineering portfolio project, emphasizing:
-
-- full-stack architecture;
-- secure authentication;
-- backend authorization;
-- relational data modeling;
-- automated testing;
-- CI practices;
-- production deployment.
+This repository is maintained as a public engineering portfolio project, emphasizing full-stack architecture, secure authentication, backend authorization, relational data modeling, automated testing, CI and production deployment.
 
 ## Security reports
 
