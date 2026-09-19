@@ -21,6 +21,8 @@ type fakeStore struct {
 	emailExists         bool
 	adminExists         bool
 	createdAdmin        User
+	changedPasswordUser string
+	changedPasswordHash string
 }
 
 func (s *fakeStore) FindUserByEmail(context.Context, string) (User, error) {
@@ -65,6 +67,54 @@ func (s *fakeStore) AdminExists(context.Context) (bool, error) {
 func (s *fakeStore) CreateAdmin(_ context.Context, user User) error {
 	s.createdAdmin = user
 	return nil
+}
+
+func (s *fakeStore) ChangePassword(_ context.Context, userID string, passwordHash string) error {
+	s.changedPasswordUser = userID
+	s.changedPasswordHash = passwordHash
+	return nil
+}
+
+func TestChangePasswordForBothRolesInvalidatesThroughStore(t *testing.T) {
+	for _, role := range []Role{RoleAdmin, RoleProfessor} {
+		t.Run(string(role), func(t *testing.T) {
+			oldHash, err := hashPassword("senha antiga segura", testArgonParams)
+			if err != nil {
+				t.Fatal(err)
+			}
+			store := &fakeStore{user: User{ID: "user-id", Email: "user@example.com", PasswordHash: oldHash, Role: role, Active: true}}
+			service := NewService(store)
+			err = service.ChangePassword(context.Background(), PublicUser{ID: "user-id", Email: "user@example.com", Role: role}, "senha antiga segura", "nova1234")
+			if err != nil {
+				t.Fatalf("expected password change, got %v", err)
+			}
+			if store.changedPasswordUser != "user-id" || store.changedPasswordHash == "" {
+				t.Fatal("expected authenticated user hash update")
+			}
+			if ok, verifyErr := VerifyPassword("nova1234", store.changedPasswordHash); verifyErr != nil || !ok {
+				t.Fatal("expected new password to verify")
+			}
+			if ok, verifyErr := VerifyPassword("senha antiga segura", store.changedPasswordHash); verifyErr != nil || ok {
+				t.Fatal("expected old password to fail")
+			}
+		})
+	}
+}
+
+func TestChangePasswordRejectsWrongCurrentAndShortNewPassword(t *testing.T) {
+	oldHash, err := hashPassword("senha antiga segura", testArgonParams)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := &fakeStore{user: User{ID: "user-id", Email: "user@example.com", PasswordHash: oldHash, Active: true}}
+	service := NewService(store)
+	user := PublicUser{ID: "user-id", Email: "user@example.com"}
+	if err := service.ChangePassword(context.Background(), user, "senha incorreta", "nova1234"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected generic credential error, got %v", err)
+	}
+	if err := service.ChangePassword(context.Background(), user, "senha antiga segura", "curta"); !errors.Is(err, ErrPasswordTooShort) {
+		t.Fatalf("expected short-password error, got %v", err)
+	}
 }
 
 func TestExpiredSessionBehavior(t *testing.T) {

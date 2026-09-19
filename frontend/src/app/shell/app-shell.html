@@ -96,6 +96,7 @@
           <span class="user-name">{{ user().name }}</span>
           <span class="user-role">{{ user().role === 'ADMIN' ? 'Admin' : 'Professor' }}</span>
         </div>
+        <button pButton type="button" class="password-button" aria-label="Alterar senha" title="Alterar senha" (click)="openPasswordDialog()"><i class="pi pi-key" aria-hidden="true"></i></button>
 
         <button
           pButton
@@ -114,4 +115,23 @@
       <router-outlet />
     </section>
   </main>
+  @if (passwordDialogOpen()) {
+    <div class="password-dialog-backdrop">
+      <section class="password-dialog" role="dialog" aria-modal="true" aria-labelledby="password-title">
+        <h2 id="password-title">Alterar senha</h2>
+        <form (ngSubmit)="changePassword()" novalidate>
+          <label for="current-password">Senha atual</label>
+          <input id="current-password" name="currentPassword" type="password" autocomplete="current-password" [(ngModel)]="passwordForm.currentPassword" [disabled]="passwordLoading()" required />
+          <label for="new-password">Nova senha</label>
+          <input id="new-password" name="newPassword" type="password" autocomplete="new-password" minlength="8" [(ngModel)]="passwordForm.newPassword" [disabled]="passwordLoading()" required />
+          @if (passwordForm.newPassword && passwordForm.newPassword.length < 8) { <p class="form-error">A nova senha deve ter pelo menos 8 caracteres.</p> }
+          <label for="confirm-password">Confirmar nova senha</label>
+          <input id="confirm-password" name="confirmPassword" type="password" autocomplete="new-password" [(ngModel)]="passwordForm.confirmPassword" [disabled]="passwordLoading()" required />
+          @if (passwordForm.confirmPassword && passwordForm.newPassword !== passwordForm.confirmPassword) { <p class="form-error">As senhas não coincidem.</p> }
+          @if (passwordError()) { <p class="form-error" role="alert">{{ passwordError() }}</p> }
+          <div class="password-dialog-actions"><button pButton type="button" (click)="closePasswordDialog()" [disabled]="passwordLoading()">Cancelar</button><button pButton type="submit" [disabled]="!passwordFormValid() || passwordLoading()">{{ passwordLoading() ? 'Alterando...' : 'Alterar senha' }}</button></div>
+        </form>
+      </section>
+    </div>
+  }
 </div>

@@ -21,6 +21,8 @@
         />
       </div>
 
+      @if (infoMessage()) { <p class="auth-info" role="status">{{ infoMessage() }}</p> }
+
       <div class="field">
         <label for="password">Senha</label>
         <input

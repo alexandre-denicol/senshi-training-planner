@@ -23,6 +23,11 @@ type loginRequest struct {
 	Password string `json:"password"`
 }
 
+type changePasswordRequest struct {
+	CurrentPassword string `json:"currentPassword"`
+	NewPassword     string `json:"newPassword"`
+}
+
 func NewHandler(service *Service, limiter *LoginLimiter, appEnv config.AppEnv) *Handler {
 	return &Handler{
 		service: service,
@@ -35,6 +40,37 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/auth/login", h.Login)
 	mux.HandleFunc("/auth/logout", h.Logout)
 	mux.Handle("/auth/me", requireMethod(http.MethodGet, h.Authenticate(http.HandlerFunc(h.Me))))
+	mux.Handle("/auth/password", requireMethod(http.MethodPut, h.Authenticate(http.HandlerFunc(h.ChangePassword))))
+}
+
+func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	user, ok := UserFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	var request changePasswordRequest
+	if err := readJSON(w, r, &request); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request")
+		return
+	}
+	if request.CurrentPassword == "" {
+		writeError(w, http.StatusBadRequest, "invalid request")
+		return
+	}
+	if err := h.service.ChangePassword(r.Context(), user, request.CurrentPassword, request.NewPassword); err != nil {
+		switch {
+		case errors.Is(err, ErrInvalidCredentials):
+			writeError(w, http.StatusUnauthorized, "invalid current password")
+		case errors.Is(err, ErrPasswordTooShort), errors.Is(err, ErrPasswordTooLong), errors.Is(err, ErrPasswordInvalid):
+			writeError(w, http.StatusBadRequest, "new password does not meet the password policy")
+		default:
+			writeError(w, http.StatusInternalServerError, "internal server error")
+		}
+		return
+	}
+	http.SetCookie(w, h.expiredSessionCookie())
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {

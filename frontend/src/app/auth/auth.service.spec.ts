@@ -92,4 +92,34 @@ describe('AuthService', () => {
     expect(service.currentUser()).toBeNull();
     expect(service.status()).toBe('unauthenticated');
   });
+
+  it('changes password through the authenticated API and clears the session', async () => {
+    const login = service.login('admin@example.com', 'senha longa segura');
+    http.expectOne('/api/auth/login').flush(adminUser);
+    await login;
+
+    const promise = service.changePassword('senha longa segura', 'nova1234');
+    const request = http.expectOne('/api/auth/password');
+    expect(request.request.method).toBe('PUT');
+    expect(request.request.withCredentials).toBe(true);
+    expect(request.request.body).toEqual({ currentPassword: 'senha longa segura', newPassword: 'nova1234' });
+    request.flush(null, { status: 204, statusText: 'No Content' });
+
+    await expect(promise).resolves.toBeUndefined();
+    expect(service.currentUser()).toBeNull();
+    expect(service.status()).toBe('unauthenticated');
+  });
+
+  it('keeps the session state safe when the password change fails', async () => {
+    const login = service.login('admin@example.com', 'senha longa segura');
+    http.expectOne('/api/auth/login').flush(adminUser);
+    await login;
+
+    const promise = service.changePassword('senha errada', 'nova1234');
+    http.expectOne('/api/auth/password').flush({ error: 'invalid current password' }, { status: 401, statusText: 'Unauthorized' });
+
+    await expect(promise).rejects.toBeTruthy();
+    expect(service.currentUser()).toEqual(adminUser);
+    expect(service.status()).toBe('authenticated');
+  });
 });
