@@ -43,6 +43,33 @@ func (s *PostgresStore) FindUserByEmail(ctx context.Context, email string) (User
 	return user, nil
 }
 
+func (s *PostgresStore) FindUserByID(ctx context.Context, userID string) (User, error) {
+	const query = `
+		SELECT id::text, name, email, password_hash, role, active
+		FROM users
+		WHERE id = $1
+			AND active = true
+		LIMIT 1`
+
+	var user User
+	err := s.pool.QueryRow(ctx, query, userID).Scan(
+		&user.ID,
+		&user.Name,
+		&user.Email,
+		&user.PasswordHash,
+		&user.Role,
+		&user.Active,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return User{}, ErrUnauthenticated
+	}
+	if err != nil {
+		return User{}, err
+	}
+
+	return user, nil
+}
+
 func (s *PostgresStore) CreateSession(ctx context.Context, session Session) error {
 	const query = `
 		INSERT INTO sessions (id, user_id, token_hash, created_at, last_seen_at, expires_at, absolute_expires_at)
